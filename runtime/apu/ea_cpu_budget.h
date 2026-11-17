@@ -106,6 +106,29 @@ namespace apu::ea_budget
         inline constexpr uint32_t kConfigRate = 212, kConfigClock = 216, kConfigPercent = 220;
     }
 
+    // NFS: ProStreet's EA SND: Carbon's budget with the divisor baked in.
+    // Once a block sub_827F5658 (from sub_827DECB8 and sub_827DEBB8) averages
+    // the mixer's busy time (timebase sub_827DC910, the mixer at 0x83073158,
+    // its config at +0), adds the voices' costs (sub_827F5778, x the float at
+    // 0x82035AF4, 64) and, while the share (config + 200) is under 100, takes
+    // off share x the float at 0x820F0238 (170666.67 = 3.2e9 / (48000 x
+    // 0.390625), Carbon's budget); over it, sub_827F5860 (f1 = how far over)
+    // expels the lowest-priority voice (sub_827F57C0) via sub_827FFCA0(voice, 2).
+    namespace prostreet
+    {
+        inline constexpr uint32_t kMixerUpdate = 0x827DECB8;
+        inline constexpr uint32_t kBudgetCheck = 0x827F5658;
+        inline constexpr uint32_t kVoiceCosts = 0x827F5778;
+        inline constexpr uint32_t kExpelOverBudget = 0x827F5860;
+        inline constexpr uint32_t kPickVoice = 0x827F57C0;
+        inline constexpr uint32_t kExpelVoice = 0x827FFCA0;
+        inline constexpr uint32_t kTimebase = 0x827DC910;
+        inline constexpr uint32_t kMixer = 0x83073158;
+        inline constexpr uint32_t kScale = 0x82035AF4;            // float: EA's units per tick (64)
+        inline constexpr uint32_t kBudgetPerPercent = 0x820F0238;  // float: 170666.67
+        inline constexpr uint32_t kConfigPercent = 200;
+    }
+
     // EA's three-block average of the mixer's own busy time, as sub_82601528
     // keeps it (mixer + 80: the average, +84/+88 the last two blocks, +92
     // which one the next block replaces).

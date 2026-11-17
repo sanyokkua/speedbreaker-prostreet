@@ -27,9 +27,9 @@ list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/thirdparty/")
 # engine calls (game/ultrawide.h, game/frame_time.h); each game implements it.
 # Carbon's builds also stub the imports only it uses
 # (kernel/import_stubs_carbon.cpp, scripts/gen_import_stubs.py).
-# ProStreet's: game/prostreet/*.cpp and kernel/import_stubs_prostreet.cpp;
-# apu/ea_cpu_budget.cpp hooks Most Wanted's or Carbon's mixer by address, so
-# a ProStreet build leaves it out.
+# ProStreet's: game/prostreet/*.cpp (some include Carbon's game/carbon/ files
+# with ProStreet's addresses) and kernel/import_stubs_prostreet.cpp;
+# apu/ea_cpu_budget.cpp hooks each game's mixer by its own address.
 if(SB_GAME STREQUAL "carbon")
     list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/game/[^/]+\\.cpp$")
     list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/debug/d3d_waits\\.cpp$")
@@ -40,7 +40,6 @@ elseif(SB_GAME STREQUAL "prostreet")
     list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/game/carbon/")
     list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/debug/d3d_waits\\.cpp$")
     list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/kernel/import_stubs_carbon\\.cpp$")
-    list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/apu/ea_cpu_budget\\.cpp$")
 else()
     list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/game/carbon/")
     list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/game/prostreet/")

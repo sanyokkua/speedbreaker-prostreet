@@ -63,6 +63,29 @@ namespace game::language
     // Danish). Speech: the game's own choice (sub_821B82E8): French, German,
     // Italian and Spanish have their own bank (copspeech_ge and _sp seen in
     // its file opens; _fr and _it by the same pattern), the others English's.
+#if defined(SB_GAME_PROSTREET)
+    // NFS: ProStreet's table (0x82B14040; game/prostreet/language.cpp): the
+    // USA disc holds the text of all of these (LANGUAGES\<disc>_GLOBAL,
+    // _FRONTEND and _INGAME.BIN); ids are the game's own. Its speech is
+    // English only on this disc (PASPEECH_EN).
+    inline constexpr Language kLanguages[] = {
+        { 0, "english", "English", "ENGLISH", "en" },
+        { 1, "french", "French", "FRENCH", "fr" },
+        { 2, "german", "German", "GERMAN", "ge" },
+        { 3, "italian", "Italian", "ITALIAN", "it" },
+        { 4, "spanish", "Spanish (Spain)", "SPANISH", "sp" },
+        { 10, "mexican", "Spanish (Mexico)", "MEXICAN", "en" },
+        { 5, "dutch", "Dutch", "DUTCH", "en" },
+        { 6, "swedish", "Swedish", "SWEDISH", "en" },
+        { 7, "danish", "Danish", "DANISH", "en" },
+        { 19, "norwegian", "Norwegian", "NORWEGIAN", "en" },
+        { 18, "finnish", "Finnish", "FINNISH", "en" },
+        { 17, "polish", "Polish", "POLISH", "en" },
+        { 9, "czech", "Czech", "CZECH", "en" },
+        { 8, "hungarian", "Hungarian", "HUNGARIAN", "en" },
+        { 15, "russian", "Russian", "RUSSIAN", "ru" },
+    };
+#else
     inline constexpr Language kLanguages[] = {
         { 0, "english", "English", "ENGLISH", "en" },
         { 1, "french", "French", "FRENCH", "fr" },
@@ -75,6 +98,7 @@ namespace game::language
         { 12, "polish", "Polish", "POLISH", "en" },
         { 13, "finnish", "Finnish", "FINNISH", "en" },
     };
+#endif
     constexpr int32_t kEnglish = 0;
     constexpr int32_t kSpanish = 4;  // the European (PAL, Spanish) disc's own: its boot passes 4
 

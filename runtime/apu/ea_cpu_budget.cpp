@@ -8,7 +8,9 @@
 #include <kernel/function.h>
 #include <report/report.h>
 
-#ifdef SB_GAME_CARBON
+#if defined(SB_GAME_PROSTREET)
+extern "C" PPC_FUNC(__imp__sub_827F5860);
+#elif defined(SB_GAME_CARBON)
 extern "C" PPC_FUNC(__imp__sub_826CDBD0);
 #else
 extern "C" PPC_FUNC(__imp__sub_82601788);
@@ -64,6 +66,25 @@ namespace
     }
 }
 
+#ifdef SB_GAME_PROSTREET
+// NFS: ProStreet's over-budget step (ea_cpu_budget.h, prostreet):
+// sub_827F5658's, f1 = how far over in EA's units. Its budget is Carbon's
+// with the divisor baked into one float: share % x 170666.67.
+PPC_FUNC(sub_827F5860)
+{
+    if (s_eaExpels)
+    {
+        __imp__sub_827F5860(ctx, base);
+        return;
+    }
+    namespace p = apu::ea_budget::prostreet;
+    const double scale = GuestFloat(base, p::kScale);
+    const uint32_t config = PPC_LOAD_U32(p::kMixer);
+    const double budget = config ? GuestFloat(base, p::kBudgetPerPercent) * GuestFloat(base, config + p::kConfigPercent) : 0;
+    const auto ms = [&](double units) { return scale > 0 ? units / scale / apu::ea_budget::kTicksPerMs : 0.0; };
+    NoteSkipped(ms(ctx.f1.f64), ms(budget));
+}
+#else
 // NFS: Carbon's over-budget step (ea_cpu_budget.h, carbon): sub_826CD9D8's,
 // f1 = how far over in EA's units. EA expels the lowest-priority voices
 // until it fits.
@@ -90,6 +111,7 @@ PPC_FUNC(sub_826CDBD0)
     const auto ms = [&](double units) { return scale > 0 ? units / scale / apu::ea_budget::kTicksPerMs : 0.0; };
     NoteSkipped(ms(ctx.f1.f64), ms(budget));
 }
+#endif
 #else
 // sub_82601528's over-budget step: f1 = how far over, in EA's units (r3 =
 // mixer + 68). EA expels the lowest-priority voices until it fits.

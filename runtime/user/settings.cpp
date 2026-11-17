@@ -123,7 +123,8 @@ namespace settings
 // NFS: Carbon: the row and its hooks (game/language.cpp) are Most Wanted's
 // (its language table and boot call); Carbon's own languages aren't
 // offered yet, so it isn't shown there either.
-#if (defined(__APPLE__) && TARGET_OS_IOS) || defined(SB_GAME_CARBON)
+// NFS: ProStreet offers its own table (game/prostreet/language.cpp).
+#if (defined(__APPLE__) && TARGET_OS_IOS) || (defined(SB_GAME_CARBON) && !defined(SB_GAME_PROSTREET))
         constexpr bool kLanguageHidden = true;
 #else
         constexpr bool kLanguageHidden = false;
@@ -542,7 +543,11 @@ namespace settings
             // Game
             { .id = Id::GameLanguage, .category = Category::Game, .type = Type::Enum, .apply = Apply::Restart, .hidden = kLanguageHidden,
               .table = "game", .key = "language", .label = "Language",
+#if defined(SB_GAME_PROSTREET)
+              .description = "The language of the game's menus and race text, from the USA disc's own files. English follows the console's language as the disc does (Spanish (Mexico) on a Spanish system). The movies and the speech stay in English, as the disc has them; a few movies have French, German, Italian, Spanish (Spain) or Russian subtitles.",
+#else
               .description = "The language of the game's menus and race text: English (the USA disc's), or French, German, Italian, Spanish, Dutch, Swedish, Danish, Polish or Finnish, from the same disc's files. The movies and the speech stay in English, as the disc has them. The European (PAL) Spanish disc has Spanish movies and speech, and starts in Spanish; another language there keeps them in Spanish.",
+#endif
               .env = "NFSMW_LANGUAGE", .defaultValue = double(game::language::kEnglish), .entries = kLanguageEntries },
         };
         static_assert(std::size(kOptions) == kCount, "one row per settings::Id");

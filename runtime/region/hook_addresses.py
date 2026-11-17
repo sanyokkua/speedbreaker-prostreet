@@ -6,7 +6,7 @@ data: globals, tables, constants). survey/region_map.py maps each to the PAL
 checks the table still covers them. Python 3, no dependencies.
 
 Most Wanted's only: NFS: Carbon's code (runtime/game/carbon/, #ifdef
-SB_GAME_CARBON blocks, a `namespace carbon` of constants) names Carbon's
+SB_GAME_CARBON blocks, a `namespace carbon` or `namespace prostreet` of constants) names Carbon's
 addresses, which have no PAL (Spanish) counterpart; it is left out, as is
 NFS: ProStreet's (runtime/game/prostreet/).
 """
@@ -62,14 +62,14 @@ def strip_carbon(text):
             continue
         out.append('')
     text = '\n'.join(out)
-    m = re.search(r'\bnamespace\s+carbon\s*\{', text)
+    m = re.search(r'\bnamespace\s+(carbon|prostreet)\s*\{', text)
     while m:
         i, level = m.end(), 1
         while i < len(text) and level:
             level += {'{': 1, '}': -1}.get(text[i], 0)
             i += 1
         text = text[:m.start()] + '\n' * text.count('\n', m.start(), i) + text[i:]
-        m = re.search(r'\bnamespace\s+carbon\s*\{', text)
+        m = re.search(r'\bnamespace\s+(carbon|prostreet)\s*\{', text)
     return text
 
 

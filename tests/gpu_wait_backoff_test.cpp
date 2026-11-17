@@ -151,7 +151,10 @@ int main(int argc, char** argv)
     if (argc >= 3)
     {
         TestHook(argv[1], "SB_HOOK(sub_825A5B20)", "SB_ORIGINAL(sub_825A5B20)");  // Most Wanted
-        TestHook(argv[2], "PPC_FUNC(sub_826E0088)", "__imp__sub_826E0088");       // NFS: Carbon
+        // NFS: Carbon (its addresses by default; NFS: ProStreet includes the
+        // same file with its own, game/prostreet/d3d_waits.cpp).
+        TestHook(argv[2], "PPC_FUNC(SB_D3D_HANG_CHECK)", "SB_D3D_IMP(SB_D3D_HANG_CHECK)");
+        CHECK(Read(argv[2]).find("#define SB_D3D_HANG_CHECK sub_826E0088") != std::string::npos, "Carbon's hang check by default");
     }
     else
         printf("  (the hooks' files not given: their checks skipped)\n");

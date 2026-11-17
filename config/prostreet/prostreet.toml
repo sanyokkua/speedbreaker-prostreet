@@ -228,3 +228,40 @@ functions = [
     { address = 0x824BBC90, size = 0x28 },
 ]
 # --- end leaf_switch_bounds ---
+
+# Game time in whole vblanks (runtime/game/prostreet/frame_time.cpp, Carbon's
+# hook on ProStreet's code): the frame's measured time (milliseconds, 16.16
+# fixed point) as the main loop (sub_825B6778) passes it to the frame
+# (sub_825B6368), Carbon's 0x824532A4 ...
+[[midasm_hook]]
+name = "GameFrameTime"
+address = 0x825B68A8
+registers = ["r3"]
+
+# ... the world's step count, just truncated from the accumulated seconds
+# (sub_822A9E10, `cmpwi cr6,r11,1`; f0 = the seconds) ...
+[[midasm_hook]]
+name = "WorldStepCount"
+address = 0x822A9E98
+registers = ["r11", "f0"]
+
+# ... and the return below one step, counted for the [perf] line.
+[[midasm_hook]]
+name = "WorldNoStep"
+address = 0x822A9E64
+
+# Hor+ and Vert+ (runtime/game/prostreet/ultrawide.cpp): the projection's x
+# and y scales (f5, f11; both of the view setup's matrices are built from
+# them) before their first store in sub_821DE9A8 (r7 = the view, its id at
+# +8) ...
+[[midasm_hook]]
+name = "UltrawideProjection"
+address = 0x821DECCC
+registers = ["r7", "f5", "f11"]
+
+# ... and the front-end (HUD) matrix's x and y scales (f13, f0), at the
+# branch that ends its widescreen case (sub_82284058).
+[[midasm_hook]]
+name = "UltrawideFrontEnd"
+address = 0x82284124
+registers = ["f13", "f0"]

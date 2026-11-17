@@ -53,8 +53,20 @@
 #include <video/refresh_fit.h>
 #include <video/vblank_lock.h>
 
-extern "C" PPC_FUNC(__imp__sub_82529BE0);
-extern "C" PPC_FUNC(__imp__sub_824680C8);
+// The game's addresses: Carbon's, unless a game with the same timing code
+// includes this file with its own (game/prostreet/frame_time.cpp).
+#ifndef SB_FT_QUANTISER
+#define SB_FT_QUANTISER sub_824680C8      // the quantiser
+#define SB_FT_WORLD sub_82529BE0          // the world's accumulator
+#define SB_FT_QUANTISER_CALL 0x82452DC4   // the quantiser's call in the frame: its return address
+#define SB_FT_FRAME_TICKS 0x82C64F88      // the frame's 1/3600 s ticks
+#define SB_FT_FRAME_SECONDS 0x82C7ABCC    // the frame's time, s (float)
+#endif
+#define SB_FT_IMP_(name) __imp__##name
+#define SB_FT_IMP(name) SB_FT_IMP_(name)
+
+extern "C" PPC_FUNC(SB_FT_IMP(SB_FT_WORLD));
+extern "C" PPC_FUNC(SB_FT_IMP(SB_FT_QUANTISER));
 
 namespace
 {
@@ -90,10 +102,9 @@ namespace
     // The 1/60 s vblanks the frame under way was given (0: its measured
     // time), for the quantiser's override. Main thread only.
     uint64_t s_givenSixtieths = 0;
-    // The quantiser's call in the frame (sub_82452D78): its return address.
-    constexpr uint32_t kQuantiserCall = 0x82452DC4;
-    constexpr uint32_t kFrameTicks = 0x82C64F88;    // the frame's 1/3600 s ticks
-    constexpr uint32_t kFrameSeconds = 0x82C7ABCC;  // the frame's time, s (float)
+    constexpr uint32_t kQuantiserCall = SB_FT_QUANTISER_CALL;
+    constexpr uint32_t kFrameTicks = SB_FT_FRAME_TICKS;
+    constexpr uint32_t kFrameSeconds = SB_FT_FRAME_SECONDS;
 
     bool NearSixty(double vblankMs)
     {
@@ -160,10 +171,10 @@ void GameFrameTime(PPCRegister& r3)
 
 // The quantiser, sub_824680C8 (f1: the frame's seconds): a frame given whole
 // vblanks gets exactly them as its 1/3600 s ticks and its time.
-PPC_FUNC(sub_824680C8)
+PPC_FUNC(SB_FT_QUANTISER)
 {
     const uint32_t lr = uint32_t(ctx.lr);
-    __imp__sub_824680C8(ctx, base);
+    SB_FT_IMP(SB_FT_QUANTISER)(ctx, base);
     if (lr != kQuantiserCall || !s_givenSixtieths || s_givenSixtieths > 6)
         return;
     PPC_STORE_U32(kFrameTicks, uint32_t(s_givenSixtieths * 60));
@@ -175,11 +186,11 @@ PPC_FUNC(sub_824680C8)
 
 // The world's accumulator, sub_82529BE0 (f1: the frame's seconds): wrapped
 // only to log what the frame handed it.
-PPC_FUNC(sub_82529BE0)
+PPC_FUNC(SB_FT_WORLD)
 {
     if (s_log)
         s_line.worldDtMs = ctx.f1.f64 * 1000.0;
-    __imp__sub_82529BE0(ctx, base);
+    SB_FT_IMP(SB_FT_WORLD)(ctx, base);
 }
 
 // WorldStepCount, at `cmpwi cr6,r11,1` (0x82529C60): r11 = the steps
