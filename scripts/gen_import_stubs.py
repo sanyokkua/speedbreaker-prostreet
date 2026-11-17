@@ -22,20 +22,22 @@ BASE_OUT = ROOT / 'runtime/kernel/import_stubs.cpp'
 GAME = os.environ.get('SB_GAME', 'mw')
 if GAME == 'carbon':
     PPC, OUT = ROOT / 'ppc-carbon', ROOT / 'runtime/kernel/import_stubs_carbon.cpp'
+elif GAME == 'prostreet':
+    PPC, OUT = ROOT / 'ppc-prostreet', ROOT / 'runtime/kernel/import_stubs_prostreet.cpp'
 elif GAME == 'mw':
     PPC, OUT = ROOT / 'ppc', BASE_OUT
 else:
-    raise SystemExit(f'SB_GAME={GAME}: mw or carbon')
+    raise SystemExit(f'SB_GAME={GAME}: mw, carbon or prostreet')
 
 imports = sorted(set(re.findall(r'PPC_EXTERN_FUNC\(__imp__(\w+)\)', (PPC / 'ppc_recomp_shared.h').read_text())))
 implemented = set()
 for src in (ROOT / 'runtime').rglob('*.cpp'):
     if src in (BASE_OUT, OUT):
         continue
-    if src.name == 'import_stubs_carbon.cpp':
+    if src.name in ('import_stubs_carbon.cpp', 'import_stubs_prostreet.cpp'):
         continue
     implemented |= set(re.findall(r'(?:PPC_FUNC|GUEST_FUNCTION_HOOK|GUEST_FUNCTION_STUB)\(\s*__imp__(\w+)', src.read_text()))
-# Carbon's builds also have Most Wanted's stub file: only what it lacks goes here.
+# Carbon's and ProStreet's builds also have Most Wanted's stub file: only what it lacks goes here.
 already = set(re.findall(r'PPC_FUNC\(__imp__(\w+)\)', BASE_OUT.read_text())) if OUT != BASE_OUT else set()
 
 missing = [n for n in imports if n not in implemented and n not in already]
@@ -44,7 +46,7 @@ lines = [
     '// elsewhere in runtime/ and rerun the script.',
     '// SpeedBreaker runtime. GPL-3.0-or-later (see COPYING).',
     (f'// {len(imports)} imports: {len(implemented & set(imports))} implemented, {len(missing)} stubbed.' if OUT == BASE_OUT else
-     f'// NFS: Carbon (SB_GAME=carbon, built only for it): {len(imports)} imports, {len(implemented & set(imports))} implemented, '
+     f'// {"NFS: ProStreet" if GAME == "prostreet" else "NFS: Carbon"} (SB_GAME={GAME}, built only for it): {len(imports)} imports, {len(implemented & set(imports))} implemented, '
      f'{len(already & set(imports))} stubbed in import_stubs.cpp, these {len(missing)} here.'),
     '#include "../stdafx.h"',
     '#include "unimplemented.h"',

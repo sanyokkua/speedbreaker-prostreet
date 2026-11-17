@@ -27,12 +27,25 @@ list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/thirdparty/")
 # engine calls (game/ultrawide.h, game/frame_time.h); each game implements it.
 # Carbon's builds also stub the imports only it uses
 # (kernel/import_stubs_carbon.cpp, scripts/gen_import_stubs.py).
+# ProStreet's: game/prostreet/*.cpp and kernel/import_stubs_prostreet.cpp;
+# apu/ea_cpu_budget.cpp hooks Most Wanted's or Carbon's mixer by address, so
+# a ProStreet build leaves it out.
 if(SB_GAME STREQUAL "carbon")
     list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/game/[^/]+\\.cpp$")
     list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/debug/d3d_waits\\.cpp$")
+    list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/game/prostreet/")
+    list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/kernel/import_stubs_prostreet\\.cpp$")
+elseif(SB_GAME STREQUAL "prostreet")
+    list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/game/[^/]+\\.cpp$")
+    list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/game/carbon/")
+    list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/debug/d3d_waits\\.cpp$")
+    list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/kernel/import_stubs_carbon\\.cpp$")
+    list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/apu/ea_cpu_budget\\.cpp$")
 else()
     list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/game/carbon/")
+    list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/game/prostreet/")
     list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/kernel/import_stubs_carbon\\.cpp$")
+    list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/runtime/kernel/import_stubs_prostreet\\.cpp$")
 endif()
 # The platform layer (platform/*.h): Windows' implementation in
 # platform/win32, everyone else's in platform/posix.
@@ -79,6 +92,8 @@ endif()
 target_include_directories(SpeedBreaker PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/kernel)
 if(SB_GAME STREQUAL "carbon")
     target_compile_definitions(SpeedBreaker PRIVATE SB_GAME_CARBON=1)
+elseif(SB_GAME STREQUAL "prostreet")
+    target_compile_definitions(SpeedBreaker PRIVATE SB_GAME_CARBON=1 SB_GAME_PROSTREET=1)
 else()
     target_compile_definitions(SpeedBreaker PRIVATE SB_GAME_MW=1)
 endif()
@@ -130,7 +145,7 @@ target_include_directories(SpeedBreaker PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/gene
 # compiled in (generated/whats_new.inc). An edit of CHANGELOG.md reconfigures.
 # This is NFS: Carbon's repository: CHANGELOG.md is Carbon's, and a Most Wanted
 # build (-DSB_GAME=mw) reads Most Wanted's, CHANGELOG-mw.md.
-if(SB_GAME STREQUAL "carbon")
+if(SB_GAME STREQUAL "carbon" OR SB_GAME STREQUAL "prostreet")
     set(SB_CHANGELOG ${CMAKE_SOURCE_DIR}/CHANGELOG.md)
 else()
     set(SB_CHANGELOG ${CMAKE_SOURCE_DIR}/CHANGELOG-mw.md)

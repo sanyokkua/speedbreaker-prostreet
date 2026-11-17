@@ -32,7 +32,23 @@
 // never both hold a SpeedBreaker.exe: Most Wanted's stays SpeedBreaker.exe.
 // SB_WINDOWS_LOGS is where Windows' message boxes say the log is (the data
 // folder of user/paths.h kUserFolderName, as %LOCALAPPDATA% shows it).
-#ifdef SB_GAME_CARBON
+#if defined(SB_GAME_PROSTREET)
+// Work in progress (SB_GAME=prostreet): boots no further than the recompiled
+// code allows yet; no release, so no repository of its own to update from.
+#define SB_GAME_TITLE "NFS: ProStreet"
+#define SB_GAME_NAME "Need for Speed: ProStreet"
+#define SB_GAME_RELEASE "the USA Xbox 360 release (English and Spanish)"
+#define SB_GAME_AUTO_RESOLUTION "Auto: from the screen and the GPU (ProStreet takes Carbon's budget for now)."
+#define SB_GAME_GAMMA_OFF "Off: the flatter picture, without the ramp."
+#define SB_GAME_UNSUPPORTED " Other editions of the game (other regions) aren't supported yet."
+#define SB_GAME_SUPPORTED_DISC "SpeedBreaker: ProStreet supports the USA release of Need for Speed: ProStreet. Other editions aren't supported yet."
+#define SB_APP_NAME "SpeedBreaker: ProStreet"
+#define SB_GITHUB_REPO "SpeedBreakerProject/speedbreaker-carbon"
+#define SB_FILE_PREFIX "speedbreaker-prostreet"
+#define SB_WINDOWS_EXE "SpeedBreaker-ProStreet.exe"
+#define SB_WINDOWS_LOGS "%LOCALAPPDATA%\\SpeedBreaker ProStreet\\logs"
+#define SB_IOS_APP_NAME "SpeedBreaker ProStreet"
+#elif defined(SB_GAME_CARBON)
 #define SB_GAME_TITLE "NFS: Carbon"
 #define SB_GAME_NAME "Need for Speed: Carbon"
 #define SB_GAME_RELEASE "the USA Collector's Edition for Xbox 360"

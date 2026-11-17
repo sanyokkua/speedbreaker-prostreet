@@ -43,7 +43,13 @@ inline std::filesystem::path GetGamePath()
 // (SB_GAME=carbon) has its own folders, SpeedBreaker Carbon (macOS, Windows)
 // or speedbreaker-carbon (Linux), and nothing to migrate: never Most Wanted's
 // settings, saves or installed game.
-#if defined(SB_GAME_CARBON) && (defined(__APPLE__) || defined(_WIN32))
+// A ProStreet build (SB_GAME=prostreet) likewise: SpeedBreaker ProStreet or
+// speedbreaker-prostreet.
+#if defined(SB_GAME_PROSTREET) && (defined(__APPLE__) || defined(_WIN32))
+inline constexpr const char* kUserFolderName = "SpeedBreaker ProStreet";
+#elif defined(SB_GAME_PROSTREET)
+inline constexpr const char* kUserFolderName = "speedbreaker-prostreet";
+#elif defined(SB_GAME_CARBON) && (defined(__APPLE__) || defined(_WIN32))
 inline constexpr const char* kUserFolderName = "SpeedBreaker Carbon";
 #elif defined(SB_GAME_CARBON)
 inline constexpr const char* kUserFolderName = "speedbreaker-carbon";

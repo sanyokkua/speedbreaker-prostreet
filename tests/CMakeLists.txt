@@ -3,10 +3,13 @@
 # -march. Run them with ctest from the build folder. None needs game files;
 # write_watch_test and vmem_host_pages_test need the build's generated code
 # (ppc_config.h, generated from your own XEX): ppc/, or ppc-carbon/ in an
-# NFS: Carbon build (-DSB_GAME=carbon), which needs no ppc/ at all.
+# NFS: Carbon build (-DSB_GAME=carbon), which needs no ppc/ at all
+# (ppc-prostreet/ in an NFS: ProStreet build).
 set(ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
 if(SB_GAME STREQUAL "carbon")
     set(GAME_PPC ${ROOT}/ppc-carbon)
+elseif(SB_GAME STREQUAL "prostreet")
+    set(GAME_PPC ${ROOT}/ppc-prostreet)
 else()
     set(GAME_PPC ${ROOT}/ppc)
 endif()
@@ -227,8 +230,11 @@ sb_test(audio_cadence_test)
 # NFS: Carbon's (a newer EA SND, the same budget): ppc-carbon/ and the
 # per-game hook in apu/ea_cpu_budget.cpp. A Carbon build checks Carbon's (its
 # ppc-carbon/ is there) and not Most Wanted's ("-": a Carbon checkout has no ppc/).
+# A ProStreet build has neither (apu/ea_cpu_budget.cpp isn't built for it:
+# ProStreet's mixer is still to be found), so no test.
 if(SB_GAME STREQUAL "carbon")
     sb_test(ea_cpu_budget_test ARGS - ${ROOT}/ppc-carbon ${RT}/apu/ea_cpu_budget.cpp)
+elseif(SB_GAME STREQUAL "prostreet")
 else()
     sb_test(ea_cpu_budget_test ARGS ${ROOT}/ppc ${ROOT}/ppc-carbon ${RT}/apu/ea_cpu_budget.cpp)
 endif()
