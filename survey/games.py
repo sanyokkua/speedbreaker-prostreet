@@ -87,6 +87,39 @@ GAMES = {
             0x8237ED98: 0x28,
         },
     ),
+    # NFS: ProStreet (Xbox 360, USA, En/Es), default.xex SHA-256 4f8b623a...
+    # Sections from game-prostreet/survey/xexsurvey.txt.
+    'prostreet': dict(
+        config='config/prostreet/prostreet.toml',
+        switch_tables='config/prostreet/switch_tables.toml',
+        switch_tables_inline='config/prostreet/switch_tables_inline.toml',
+        survey='game-prostreet/survey',
+        ppc='ppc-prostreet',
+        text=(0x82140000, 0x82ADCED4),
+        pdata=(0x820F1400, 0x821344C0),
+        data=[(0x82000400, 0x820F1354), (0x82AE0000, 0x8309C790)],
+        drop=set(),
+        add=[
+            # Byte-offset tables as Carbon's: lis/addi r12=table; lbzx r0 =
+            # byte[rI]; r12 = base + r0; mtctr; nop; nop; bctr. No bounds
+            # check (a trusted index); XenonAnalyse finds neither. Entries run
+            # to the table's 16-byte end (zero is case 0's code: harmless).
+            # 0x8286ECE4 (in .pdata fn 0x8286EB38): table 0x82071B70, index
+            # r10, 9 cases and 7 zeros.
+            dict(base=0x8286ECE4, r=10, labels=[0x8286ECE8, 0x8286ECF4, 0x8286ED00, 0x8286ED0C, 0x8286ED18, 0x8286ED24, 0x8286ED30, 0x8286ED3C, 0x8286ED4C, 0x8286ECE8, 0x8286ECE8, 0x8286ECE8, 0x8286ECE8, 0x8286ECE8, 0x8286ECE8, 0x8286ECE8]),
+            # 0x82898F34 (leaf after .pdata fn 0x82898DB0): table 0x820719B0,
+            # index r3, 12 cases and 4 zeros.
+            dict(base=0x82898F34, r=3, labels=[0x82898F38, 0x82898F48, 0x82898F58, 0x82898F68, 0x82898F78, 0x82898F88, 0x82898F98, 0x82898FA8, 0x82898FB8, 0x82898FC8, 0x82898FD8, 0x82898FE8, 0x82898F38, 0x82898F38, 0x82898F38, 0x82898F38]),
+        ],
+        # Tail-call stubs that end in `b +4` into the next (.pdata) function,
+        # as Most Wanted's and Carbon's: without an explicit size XenonRecomp
+        # treats the b as internal and swallows the neighbour with its jump
+        # tables (0x823C3800, 0x824BBE14, 0x824BC044, 0x824BC228).
+        manual_bounds={
+            0x823C37C8: 0x10,
+            0x824BBC90: 0x28,
+        },
+    ),
 }
 
 NAME = os.environ.get('SB_GAME', 'mw')
