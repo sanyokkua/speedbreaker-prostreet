@@ -1,59 +1,130 @@
 # SpeedBreaker: ProStreet
 
-*Need for Speed: ProStreet* (EA Black Box, 2007) running natively on Apple Silicon Macs.
+*Need for Speed: ProStreet* (EA Black Box, 2007), the Xbox 360 version, running natively on
+Apple Silicon Macs.
 
-The Xbox 360 game's own code is translated to C++ and runs on **SpeedBreaker**'s runtime, the
-engine project(u) built for [SpeedBreaker](https://github.com/SpeedBreakerProject/speedbreaker)
-(*Most Wanted*) and [SpeedBreaker: Carbon](https://github.com/SpeedBreakerProject/speedbreaker-carbon).
-This repository is a fork of SpeedBreaker: Carbon with ProStreet added as a third game
-(`-DSB_GAME=prostreet`). Nearly everything here is their work: the recompiler setup, the
-Xbox 360 kernel and GPU emulation, the Vulkan renderer, the installer, the settings menu. This fork
-adds what ProStreet needed on top. Please support and credit the original projects.
+This is a fork of [SpeedBreaker: Carbon](https://github.com/SpeedBreakerProject/speedbreaker-carbon)
+by **project(u)**, who also made [SpeedBreaker](https://github.com/SpeedBreakerProject/speedbreaker)
+for *Most Wanted*. Their projects translate an Xbox 360 game's code into native code and run it on
+a runtime that stands in for the console. Nearly everything here is their work: the recompiler
+setup, the console's kernel and GPU emulation, the Vulkan renderer, the installer and the settings
+menu. This fork adds ProStreet to it as a third game. All thanks go to project(u) and to the
+projects they build on (see [Credits](#credits)).
 
-**No game files are included.** You need your own **USA Xbox 360 disc** of NFS: ProStreet
-(English and Spanish), as a disc image (ISO). The app installs the game from it.
+## Status
 
-How the port was made, and every fix ProStreet needed: [docs/PROSTREET_SURVEY.md](docs/PROSTREET_SURVEY.md).
-What changed in each version: [CHANGELOG-prostreet.md](CHANGELOG-prostreet.md).
-The original SpeedBreaker: Carbon README: [README-carbon.md](README-carbon.md).
+This project is an experiment based on the existing ports. It runs smoothly (60 fps on an M1 Pro)
+and the race modes tried so far (grip, drift, drag, speed, time attack) play without known
+problems. But:
 
-## Play
+- It is **not actively supported**. The author works on it only when time allows.
+- The game has **not been played from start to finish** on it, so issues may remain.
+- macOS on Apple Silicon only (the same code may build on Linux or Windows as the originals do,
+  but nobody has tried). Offline only; two-player split screen hasn't been looked at.
 
-1. Download `SpeedBreaker-ProStreet-macos.dmg` from [Releases](https://github.com/sanyokkua/speedbreaker-prostreet/releases/latest)
-   (Apple Silicon Mac, macOS 15 or newer).
-2. Open it and drag **SpeedBreaker ProStreet** to Applications.
-3. **Open it.** The app isn't notarized by Apple, so the first time you open it, macOS refuses.
-   Close that message (don't move the app to the Trash), then go to **System Settings > Privacy &
-   Security**, scroll down to the message about SpeedBreaker ProStreet, click **Open Anyway** and
-   confirm. Once per new download. On current macOS, Control-click > Open no longer skips this.
-4. **Put your disc image in a `Games` folder in your home folder** (`~/Games`), where the app
-   looks by itself, or pick it anywhere with *Browse for image...*.
-5. **Install.** The app checks the image and installs the game (about 7.5 GB) into
-   `~/Library/Application Support/SpeedBreaker ProStreet`, once.
+How the port was made, step by step: [docs/PROSTREET_SURVEY.md](docs/PROSTREET_SURVEY.md).
+Changes per version: [CHANGELOG-prostreet.md](CHANGELOG-prostreet.md).
 
-Saves and settings live in that folder too. Settings: **F1** or **Cmd+,**, or Back + Start on a
-controller.
+## Screenshots
 
-### What you get
+| | |
+|---|---|
+| ![Main menu](docs/screenshots/main-menu.webp) | ![Drag race](docs/screenshots/drag-race.webp) |
+| ![Burnout with tire smoke](docs/screenshots/burnout-smoke.webp) | ![Settings](docs/screenshots/settings.webp) |
 
-- 60 fps in races and menus, game time in whole display refreshes (no skipped or doubled world
-  steps), and no CPU core spinning while the game waits for the GPU.
-- Internal Resolution up to 3x (2160p), FSR 1 upscaling, HDR output, Brightness, Shadow
-  Resolution, and Fill Screen for 16:10 and ultrawide screens.
-- The menus in any of the 15 languages on the disc (speech and movies stay English).
-- Controllers (Xbox, PlayStation and others SDL knows), keyboard, USB wheels (experimental).
+## Install
 
-On an M1 Pro, 2x Internal Resolution with Bicubic upscaling and 1x shadows holds 60 fps; FSR 1
-and 2x shadows cost GPU time.
+You need an **Apple Silicon Mac with macOS 15 or newer** and your own disc image (ISO) of the
+**USA Xbox 360 release** of *Need for Speed: ProStreet* (English and Spanish). Other regions and
+the PC, PS3 and Wii versions don't work. No game files are included.
 
-### Known issues
+1. Download `SpeedBreaker-ProStreet-macos.dmg` from
+   [Releases](https://github.com/sanyokkua/speedbreaker-prostreet/releases/latest), open it and
+   drag **SpeedBreaker ProStreet** to Applications.
+2. **Open it.** The app isn't notarized by Apple, so the first time macOS refuses. Close that
+   message (don't move the app to the Trash), go to **System Settings > Privacy & Security**,
+   scroll to the message about SpeedBreaker ProStreet, click **Open Anyway** and confirm. Once
+   per new download.
+3. **Put your disc image in a `Games` folder in your home folder** (`~/Games`), where the app
+   looks by itself, or choose it anywhere with *Browse for image...*.
+4. **Install.** The app checks the image (its `default.xex` must be the USA release's) and
+   installs the game, about 7.5 GB, into `~/Library/Application Support/SpeedBreaker ProStreet`.
+   You can delete the ISO afterwards. Saves and settings live in that folder too.
 
-- Offline only. Two-player split screen hasn't been looked at.
-- With Fill Screen on a 16:10 screen, some full-screen menu overlays don't reach the top and
-  bottom edges.
-- Movies and speech are English in every language (the disc has no others).
+Settings: **F1** or **Cmd+,**, or Back + Start on a controller. On an M1 Pro, Internal
+Resolution 2x with Bicubic upscaling and 1x shadows holds 60 fps; FSR 1 and 2x shadows cost GPU
+time. The menus can be shown in any of the 15 languages on the disc (Settings > Game); speech and
+movies stay English.
 
-## Build it (macOS, Apple Silicon)
+**Known issues:** with Fill Screen on a 16:10 screen, some full-screen menu overlays don't reach
+the top and bottom edges.
+
+## How it works
+
+The Xbox 360 runs PowerPC code on a custom ATI GPU (Xenos). There is no emulator here: the
+game's executable is translated once, ahead of time, into C++ that compiles to native ARM64. The
+runtime then provides what the console would: its kernel and system calls, memory, threads,
+files, audio, input, and a GPU that accepts the game's Xenos commands and draws them with Vulkan.
+
+### Build time: from the disc to an app
+
+```mermaid
+flowchart LR
+    iso["Your USA disc image<br/>(ISO)"] -->|extract-xiso| xex["default.xex<br/>(PowerPC code)"]
+    xex --> survey["Survey<br/>function bounds, jump tables,<br/>compiler helpers"]
+    survey --> toml["config/prostreet/*.toml<br/>+ hook addresses"]
+    xex --> recomp["XenonRecomp<br/>(+ SpeedBreaker patches)"]
+    toml --> recomp
+    recomp --> ppc["ppc-prostreet/<br/>~84,000 functions as C++"]
+    ppc --> clang["clang, Release<br/>(native ARM64)"]
+    runtime["runtime/<br/>kernel, GPU, audio, UI"] --> clang
+    clang --> app["SpeedBreaker ProStreet.app"]
+```
+
+The generated C++ is the game's code, so it is never stored in this repository. Each build makes
+it from your own disc, and GitHub can't build releases for the same reason.
+
+### Run time: what happens while you play
+
+```mermaid
+flowchart TB
+    subgraph game["Recompiled game code (native ARM64)"]
+        logic["Game logic, physics, AI"]
+        d3d["The game's own Direct3D<br/>(writes Xenos GPU commands)"]
+    end
+    subgraph rt["SpeedBreaker runtime"]
+        kernel["Kernel and XAM<br/>threads, files, saves, timers"]
+        cp["Command processor<br/>reads the GPU command ring"]
+        sh["Shader translator<br/>Xenos microcode to GLSL to SPIR-V"]
+        r["Vulkan renderer<br/>EDRAM targets, resolves, textures"]
+        apu["Audio<br/>XMA decoding (FFmpeg)"]
+        hooks["Game hooks<br/>frame pacing, Fill Screen,<br/>language, GPU waits"]
+        ui["Presenter, settings menu,<br/>installer, input (SDL3)"]
+    end
+    logic -->|system calls| kernel
+    logic --> apu
+    d3d -->|command ring in guest memory| cp
+    cp --> sh
+    cp --> r
+    sh --> r
+    hooks -.->|replace or patch a few game functions| game
+    r -->|Vulkan| mvk["MoltenVK"] --> metal["Metal / Apple GPU"]
+    ui --> metal
+```
+
+- **Memory.** The game sees a 4 GB big-endian address space, as on the console. The GPU reads
+  it directly, and writes are tracked page by page so the CPU and GPU see each other's data in
+  the right order.
+- **Threads.** Each guest thread is a host thread. ProStreet relies on the console's store
+  ordering between threads, so its build orders memory accesses as x86 does (`SB_GUEST_TSO`).
+- **Graphics.** The Xenos GPU's EDRAM render targets, tiled rendering and resolves are mapped
+  onto Vulkan images, and its shaders are translated when first used and cached.
+- **Hooks.** A handful of the game's functions are replaced or patched by address: whole display
+  refreshes for game time, Hor+/Vert+ for other screen shapes, the menu language, and backing off
+  instead of spinning while the game waits for the GPU. ProStreet's addresses were found by
+  matching Carbon's code, the same engine one year older.
+
+## Build from source (macOS, Apple Silicon)
 
 Needs Xcode's command line tools and, from Homebrew, `brew install llvm lld cmake ninja molten-vk`.
 
@@ -92,23 +163,26 @@ NFSMW_GAME_DIR="$PWD/game-prostreet/files" build/release/runtime/SpeedBreaker
 Tests: `ctest --test-dir build/release` (`swapchain_use_test` can fail under a full parallel run
 and passes alone) and `tests/run_instr_tests.sh` for the recompiler's instructions.
 
-GitHub can't build releases: making the game's C++ needs the disc's `default.xex`, which is EA's
-and never goes in this repository. Releases are built locally as above.
+The original SpeedBreaker: Carbon README, with its Linux, SteamOS and Windows instructions, is
+kept as [README-carbon.md](README-carbon.md).
 
-## ProStreet-specific notes
+## What ProStreet needed
 
-- **Memory ordering.** ProStreet's threads hand data to each other without barriers, relying on
-  the Xbox's (and x86's) store order. ARM64 doesn't keep it, which showed as single wrong frames
-  in busy scenes. A ProStreet build orders the translated code's memory accesses as x86 does
-  (`SB_GUEST_TSO`, on by default for ProStreet).
-- **Dynamic vertex buffers.** ProStreet refills large vertex buffers every frame; the renderer
-  copies them at draw time instead of making the game wait for the GPU (a dropped frame about
-  once a second before).
-- **No HDR highlights.** Carbon's HDR output recovers light above white from its floating-point
-  scene; ProStreet draws its scene in 8 bits, so HDR output here is the presenter's.
-- **Movies** are EA VP6, decoded by the game; they keep their 16:9 shape under Fill Screen.
-- The fixes in the shared renderer (a depth clear clearing overlapped depth targets, pixel
-  shader depth export, dynamic vertex copies) are general and may help the other games too.
+Beyond SpeedBreaker: Carbon, in short (details in [docs/PROSTREET_SURVEY.md](docs/PROSTREET_SURVEY.md)):
+
+- **Recompiling:** three PowerPC vector instructions XenonRecomp didn't know, and hand fixes to
+  a few jump tables and function bounds.
+- **Booting:** four kernel calls the other games never made, such as checking whether a thread
+  has exited.
+- **Graphics:** a depth clear that also clears the depth targets sharing its EDRAM (tire smoke),
+  pixel shaders that write depth (smoke behind cars, cars behind walls), and copying large
+  vertex buffers the game refills every frame instead of waiting for the GPU (a dropped frame
+  every second).
+- **Threads:** x86-style memory ordering (single wrong frames in busy scenes).
+- **Parity with Carbon:** game time in whole display refreshes, GPU-wait back-off, the sound
+  mixer's CPU budget, Fill Screen, the language setting and Shadow Resolution.
+- **Not applicable:** HDR highlights (ProStreet draws its scene in 8 bits), nitrous light trails
+  (drawn differently) and movie pacing (VP6 movies, decoded by the game).
 
 ## Diagnostics
 
@@ -122,16 +196,16 @@ and never goes in this repository. Releases are built locally as above.
 
 **SpeedBreaker and SpeedBreaker: Carbon are made by project(u)**
 ([SpeedBreakerProject](https://github.com/SpeedBreakerProject), [projectugarte.com](https://projectugarte.com/)).
-This port only exists because of their engine and their documented approach. ProStreet's port
-(this fork) by [sanyokkua](https://github.com/sanyokkua).
+This port exists only because of their engine and their well-documented approach. The ProStreet
+additions in this fork are by [sanyokkua](https://github.com/sanyokkua).
 
-They in turn thank the **hedge-dev** team, for XenonRecomp and the approach Unleashed Recompiled
-pioneered, and the **Xenia** project, for a decade of Xbox 360 research. The open-source projects
-in this build:
+project(u) in turn thank the **hedge-dev** team, for XenonRecomp and the approach Unleashed
+Recompiled pioneered, and the **Xenia** project, for a decade of Xbox 360 research. The
+open-source projects in this build:
 
 | Project | What it's used for | License |
 |---|---|---|
-| [SpeedBreaker](https://github.com/SpeedBreakerProject/speedbreaker) and [SpeedBreaker: Carbon](https://github.com/SpeedBreakerProject/speedbreaker-carbon) (project(u) and contributors) | The whole runtime, renderer, installer and tools this fork builds on | GPL-3.0-or-later |
+| [SpeedBreaker](https://github.com/SpeedBreakerProject/speedbreaker) and [SpeedBreaker: Carbon](https://github.com/SpeedBreakerProject/speedbreaker-carbon) (project(u) and contributors) | The runtime, renderer, installer and tools this fork builds on | GPL-3.0-or-later |
 | [XenonRecomp](https://github.com/hedge-dev/XenonRecomp) (hedge-dev and contributors) | The PowerPC-to-C++ recompiler; its XenonUtils (XEX loading) | MIT |
 | [Unleashed Recompiled](https://github.com/hedge-dev/UnleashedRecomp) (hedge-dev and contributors) | Parts of the kernel, XAM, memory and threading code | GPL-3.0-or-later |
 | [Xenia](https://github.com/xenia-project/xenia) (Ben Vanik and Xenia contributors) | GPU register, microcode and Xenos headers; the reference for kernel, XMA and GPU behaviour | BSD-3-Clause |
@@ -173,7 +247,8 @@ by or sponsored by Electronic Arts Inc., the Need for Speed brand, Microsoft or 
 "Need for Speed" and "ProStreet" are trademarks of Electronic Arts Inc. Xbox and Xbox 360 are
 trademarks of Microsoft. All other trademarks, including PlayStation, Apple, Mac, macOS, Vulkan
 and AMD, belong to their respective owners and are used only to describe what this works with.
-No logos, box art or key art of the game are used.
+The screenshots are from the author's own play on this port and show the game only to document
+that it runs.
 
 **No game files are included or distributed.** This project contains no game data or assets: no
 textures, models, audio, movies or disc files. To play, you need your own legally obtained backup
