@@ -5857,6 +5857,32 @@ void main()
             s_pendingClears.push_back({ rt, rect, ca.clearValue });
         }
 
+        // EDRAM is one memory, but each layout here is its own image: a depth
+        // clear also clears the other depth targets based inside the EDRAM
+        // tiles it covers (whole targets: their tiles run to the end of
+        // EDRAM). ProStreet draws its quarter-size particle pass (near smoke
+        // and dust) with depth at base 2000, pitch 320, inside the scene's
+        // 4x MSAA depth (base 1024, pitch 1280: 1024 tiles a 256-row band),
+        // and never clears it: the scene's clear does. Left at zero, every
+        // particle failed LEQUAL. Tiles are 80x16 samples; 2x MSAA doubles
+        // the rows, 4x the rows and columns.
+        void ClearOverlappedDepth(RenderTarget* cleared, uint32_t pitch, xenos::MsaaSamples msaa, int32_t rows)
+        {
+            const uint32_t sx = msaa == xenos::MsaaSamples::k4X ? 2 : 1;
+            const uint32_t sy = msaa == xenos::MsaaSamples::k1X ? 1 : 2;
+            const uint32_t tilesPerRow = (pitch * sx + 79) / 80;
+            const uint32_t end = cleared->base + tilesPerRow * ((uint32_t(std::max(rows, 0)) * sy + 15) / 16);
+            for (auto& [key, slot] : s_targets)
+            {
+                RenderTarget* t = slot.get();
+                if (!t || t == cleared || !t->depth || t->base <= cleared->base || t->base >= end)
+                    continue;
+                LogOnce(0x4100 + (t->base & 0x7FF), "depth clear at base %u (pitch %u) also clears the depth target at base %u (pitch %u)",
+                    cleared->base, pitch, t->base, t->pitch);
+                ClearRect(t, { 0, 0, int32_t(t->guestWidth), int32_t(t->guestHeight) });
+            }
+        }
+
         // NFSMW_LOG_SHADOWMAP=1 (diagnostic): every 5 s, the first depth
         // resolve from a surface of pitch 1600 (the sun's shadow map) is
         // copied back after it, and a [shadowmap] line gives the share of its
@@ -7612,6 +7638,7 @@ void main()
                 }
             }
 
+            const int32_t guestRows = r.y1;  // (before the shift: rows of the surface the clear covers)
             // Clears (in host target coordinates, see TileShift).
             {
                 auto [shiftX, shiftY] = TileShift();
@@ -7625,7 +7652,9 @@ void main()
             if (copyControl.depth_clear_enable)
             {
                 auto di = Reg<reg::RB_DEPTH_INFO>();
-                ClearRect(GetTarget(di.depth_base, uint32_t(di.depth_format), true, pitch), r);
+                RenderTarget* cleared = GetTarget(di.depth_base, uint32_t(di.depth_format), true, pitch);
+                ClearRect(cleared, r);
+                ClearOverlappedDepth(cleared, pitch, surfaceInfo.msaa_samples, guestRows);
             }
             if (copyControl.color_clear_enable && depthSource)
                 LogOnce(0x400, "color clear requested with a depth resolve source");
