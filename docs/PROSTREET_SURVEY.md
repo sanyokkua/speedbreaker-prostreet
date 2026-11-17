@@ -133,7 +133,23 @@ tests: Xenia's, MW's, Carbon's and ProStreet's. All pass.
   engine's game interface (`game/*.h`), as Carbon's `hfr.cpp`/`language.cpp`
   do. Nothing there patches a guest address yet.
 
-## Risks and next round (boot)
+## Boot (round 2): it boots and races
+
+The game runs on macOS arm64 from intro to a race at 50-60 fps, with sound
+and a PS4 pad. That took four runtime changes, each found from a crash or
+a hang report:
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Abort opening `NFS\ZDIR.BIN` | `NtQueryInformationFile` class 27, `XFileXctdCompressionInformation` | Answered as Xenia does: `STATUS_INVALID_PARAMETER` with a zeroed buffer, so the file is treated as not XCTD-compressed. Class 26 (sector, a path hash) was added too. |
+| Exit at boot | `XamUserCreateAchievementEnumerator` was a stub | An empty enumerator |
+| Exit at boot | `XAudioGetSpeakerConfig` was a stub | XCONFIG's user audio flags, the same word `ExGetXConfigSetting` gives |
+| Black screen after the intro (hang report: the main thread in `SwitchToThread` loops) | The game's `GetExitCodeThread` (XAPI, `sub_82A6C9B8`) reads the KTHREAD's `SignalState` (+4) and exit status (+0x140). Runtime handles are host objects, so the loader thread looked alive forever. | Guest threads record their exit code. ProStreet's `GetExitCodeThread` is replaced (`game/prostreet/xapi_threads.cpp`). |
+
+Most Wanted and Carbon never call these. Carbon, rebuilt from this tree,
+still boots and renders.
+
+## Risks and next round
 
 1. **Imports on the boot path.** Implement the new imports the boot actually
    hits, found with the kernel trace. Scatter/gather file I/O and the STFS

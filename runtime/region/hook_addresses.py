@@ -7,7 +7,8 @@ checks the table still covers them. Python 3, no dependencies.
 
 Most Wanted's only: NFS: Carbon's code (runtime/game/carbon/, #ifdef
 SB_GAME_CARBON blocks, a `namespace carbon` of constants) names Carbon's
-addresses, which have no PAL (Spanish) counterpart; it is left out.
+addresses, which have no PAL (Spanish) counterpart; it is left out, as is
+NFS: ProStreet's (runtime/game/prostreet/).
 """
 import pathlib
 import re
@@ -15,7 +16,7 @@ import re
 USA_XEX_SHA256 = 'aebdf3c14d1e4e4ed2c130d94bc1a0e97bd6d5bf39bdfdef33c3909c9cc4ba4c'
 PAL_ES_XEX_SHA256 = 'aad15fc218d034de3131f746e0b763dd8049a40dd676efc87667fcaf4fc72694'
 
-SKIP_DIRS = {'thirdparty', 'carbon'}
+SKIP_DIRS = {'thirdparty', 'carbon', 'prostreet'}  # other games' hooks: their own addresses
 SKIP_FILES = {'pal_es_addresses.inc', 'pal_es_names.h'}
 EXTENSIONS = {'.cpp', '.h', '.inc', '.mm'}
 SUB = re.compile(r'\bsub_(82[0-9A-F]{6})\b')
