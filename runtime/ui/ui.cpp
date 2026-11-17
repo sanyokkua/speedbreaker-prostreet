@@ -779,6 +779,13 @@ namespace ui
                 ToggleSettings();
                 return;
             }
+            // Cmd+D (Ctrl+D elsewhere): the next frame's draws into the log
+            // (gpu/renderer.h RequestDrawLog), for rendering bug reports.
+            if (e.key.key == SDLK_D && (e.key.mod & (SDL_KMOD_GUI | SDL_KMOD_CTRL)) && !e.key.repeat)
+            {
+                gpu::renderer::RequestDrawLog();
+                return;
+            }
             if (s_settingsOpen && SettingsMenuTakesKey(e.key))
                 return;  // a Controls row took it: ImGui doesn't act on it too
             break;

@@ -9721,6 +9721,43 @@ void main()
         }
     }
 
+    // RequestDrawLog: 1 armed (from the next frame), 2 logging this frame.
+    std::atomic<int> s_drawLog{ 0 };
+    uint32_t s_drawLogIndex = 0;
+
+    void RequestDrawLog()
+    {
+        int idle = 0;
+        if (s_drawLog.compare_exchange_strong(idle, 1))
+            fprintf(stderr, "[drawlog] armed: the next frame's draws follow\n");
+    }
+
+    static void LogDraw(uint32_t initiatorValue, xenos::EdramMode mode)
+    {
+        auto r = [](uint32_t index) { return s_regs[index]; };
+        char line[1024];
+        int n = snprintf(line, sizeof(line), "[drawlog] %4u mode %u init %08x vs %016llx ps %016llx surf %08x c0 %08x c1 %08x d %08x wo %08x"
+            " cctl %08x bl0 %08x dctl %08x cmask %08x copy %08x dest %08x dpitch %08x dinfo %08x",
+            s_drawLogIndex++, uint32_t(mode), initiatorValue,
+            (unsigned long long)(s_vs ? s_vs->hash : 0), (unsigned long long)(s_ps ? s_ps->hash : 0),
+            r(XE_GPU_REG_RB_SURFACE_INFO), r(XE_GPU_REG_RB_COLOR_INFO), r(XE_GPU_REG_RB_COLOR1_INFO), r(XE_GPU_REG_RB_DEPTH_INFO),
+            r(XE_GPU_REG_PA_SC_WINDOW_OFFSET), r(XE_GPU_REG_RB_COLORCONTROL), r(XE_GPU_REG_RB_BLENDCONTROL0),
+            r(XE_GPU_REG_RB_DEPTHCONTROL), r(XE_GPU_REG_RB_COLOR_MASK), r(XE_GPU_REG_RB_COPY_CONTROL),
+            r(XE_GPU_REG_RB_COPY_DEST_BASE), r(XE_GPU_REG_RB_COPY_DEST_PITCH), r(XE_GPU_REG_RB_COPY_DEST_INFO));
+        if (s_ps && mode != xenos::EdramMode::kCopy)
+        {
+            uint32_t slots = s_ps->info.texture2DMask | s_ps->info.texture3DMask | s_ps->info.textureCubeMask;
+            for (; slots && n < int(sizeof(line)) - 48; slots &= slots - 1)
+            {
+                const uint32_t slot = uint32_t(__builtin_ctz(slots));
+                const uint32_t* f = &s_regs[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + slot * 6];
+                n += snprintf(line + n, sizeof(line) - n, " t%u %08x/%u/%ux%u", slot, f[1] & 0x1FFFF000u, f[1] & 0x3F,
+                    (f[2] & 0x1FFF) + 1, ((f[2] >> 13) & 0x1FFF) + 1);
+            }
+        }
+        fprintf(stderr, "%s\n", line);
+    }
+
     void Draw(uint32_t initiatorValue, uint32_t dmaBase, uint32_t dmaSizeValue)
     {
         if (!s_vk)
@@ -9728,6 +9765,8 @@ void main()
         reg::VGT_DRAW_INITIATOR initiator;
         initiator.value = initiatorValue;
         auto edramMode = Reg<reg::RB_MODECONTROL>().edram_mode;
+        if (s_drawLog.load(std::memory_order_relaxed) == 2)
+            LogDraw(initiatorValue, edramMode);
         if (edramMode == xenos::EdramMode::kCopy)
         {
             Resolve();
@@ -9801,7 +9840,14 @@ void main()
             depth = GetTarget(di.depth_base, uint32_t(di.depth_format), true, pitch);
         }
         if (!depth && writeMask == 0)
-            return;  // nothing visible (memexport-only draws are not supported yet)
+        {
+            // Nothing visible (memexport-only draws are not supported yet):
+            // said once per vertex shader, so a game that needs them shows.
+            if (s_vs->info.usesMemExport)
+                LogOnce((0x31ull << 56) | (s_vs->hash & 0xFFFFFFFFFFFFFFull), "memexport-only draw skipped (vs_%016llx)",
+                    (unsigned long long)s_vs->hash);
+            return;
+        }
         // NFSMW_OCCLUSION=1, an occlusion query bracket open: this draw is
         // counted (ZpassDone).
         const bool zpdCount = s_zpdOn && !s_zpdOpen.Empty();
@@ -9978,6 +10024,10 @@ void main()
         switch (initiator.prim_type)
         {
         case xenos::PrimitiveType::kPointList:
+            // Xenos point sprites are quads (their size from PA_SU_POINT_SIZE
+            // or the shader); drawn here as 1-pixel points (gl_PointSize 1).
+            LogOnce((0x32ull << 56) | (s_vs->hash & 0xFFFFFFFFFFFFFFull), "point list draw (vs_%016llx, %u points): drawn as 1-pixel points",
+                (unsigned long long)s_vs->hash, count);
             topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
             polygonal = false;
             if (src.indexed) convertAll(false);
@@ -11807,6 +11857,19 @@ void main()
     {
         if (!s_vk || width == 0 || height == 0)
             return false;
+        // NFSMW_DRAW_LOG_AT=<s>: as Cmd+D, once, that many seconds after launch.
+        static const double s_drawLogAt = [] { const char* v = std::getenv("NFSMW_DRAW_LOG_AT"); return v ? std::atof(v) : -1.0; }();
+        static const auto s_launch = std::chrono::steady_clock::now();
+        if (static bool done = false; !done && s_drawLogAt >= 0 &&
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - s_launch).count() >= s_drawLogAt)
+        {
+            done = true;
+            RequestDrawLog();
+        }
+        if (int armed = 1; s_drawLog.compare_exchange_strong(armed, 2))
+            s_drawLogIndex = 0;
+        else if (int logging = 2; s_drawLog.compare_exchange_strong(logging, 0))
+            fprintf(stderr, "[drawlog] end of the frame (%u draws and resolves)\n", s_drawLogIndex);
         // NFSMW_SHOW_TEXTURE=<hex base>,<width>,<height>: present that tiled
         // 32-bit guest texture instead of the front buffer (debugging).
         static const std::array<uint32_t, 3> showTexture = [] {

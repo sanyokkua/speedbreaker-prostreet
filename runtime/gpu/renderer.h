@@ -43,6 +43,11 @@ namespace gpu::renderer
     // IM_LOAD / IM_LOAD_IMMEDIATE: `words` in guest (big-endian) order.
     void LoadShader(uint32_t type, const uint32_t* words, uint32_t dwords);
 
+    // Cmd+D (ui.cpp): write the next whole frame's draws and resolves to the
+    // log, one [drawlog] line each with their raw GPU state (targets, blend,
+    // depth, the pixel shader's textures), to see what a frame draws where.
+    void RequestDrawLog();
+
     // DRAW_INDX / DRAW_INDX_2 (VGT_DRAW_INITIATOR, and VGT_DMA_BASE/SIZE for
     // indexed draws). In copy mode this is a resolve.
     void Draw(uint32_t initiator, uint32_t dmaBase, uint32_t dmaSize);
