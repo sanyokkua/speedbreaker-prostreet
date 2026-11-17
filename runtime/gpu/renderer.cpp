@@ -10247,6 +10247,38 @@ void main()
         if (g_eagerWrites || s_shadowMode)
         {
             constexpr uint32_t kSnapshotMax = 64 * 1024;
+            // Larger ranges the CPU keeps rewriting are copied too, up to
+            // kDynamicSnapshotMax: ProStreet refills two dynamic vertex
+            // buffers every frame (75 KB from sub_8284E4E8 and 274 KB from
+            // sub_826BF490 in a race) while the GPU still reads the last
+            // frame's, and guarded, the CPU waited 11-12 ms a frame for the
+            // GPU, a dropped frame about once a second. A range is dynamic
+            // when its write sequence moved since its last draw; while copied
+            // it isn't guarded, so its writes go unseen: it stays dynamic for
+            // kDynamicFrames, then is guarded once to look again. Static
+            // meshes never move and stay guarded, never copied.
+            // NFSMW_DYNAMIC_SNAPSHOTS=0: only kSnapshotMax, as before.
+            constexpr uint32_t kDynamicSnapshotMax = 512 * 1024;
+            constexpr uint64_t kDynamicFrames = 300;
+            static const bool dynamicSnapshots = [] { const char* v = std::getenv("NFSMW_DYNAMIC_SNAPSHOTS"); return !v || v[0] != '0'; }();
+            struct DynamicRange { uint64_t sequence = 0, until = 0; };
+            static std::unordered_map<uint32_t, DynamicRange> dynamicRanges;  // by base (command processor only)
+            auto dynamicVertices = [&](uint32_t base, uint32_t size) {
+                if (!dynamicSnapshots || size > kDynamicSnapshotMax)
+                    return false;
+                if (dynamicRanges.size() > 4096)
+                    dynamicRanges.clear();
+                DynamicRange& d = dynamicRanges[base];
+                if (d.until > s_frame)
+                    return true;
+                const uint64_t sequence = writewatch::WriteSequence(base, size);
+                const bool moved = d.sequence != 0 && sequence != d.sequence;
+                d.sequence = sequence;
+                if (!moved)
+                    return false;
+                d.until = s_frame + kDynamicFrames;
+                return true;
+            };
             using Range = SnapshotRange;
             // HFR M3: the draw's vertex indices (with VGT_INDX_OFFSET), for a
             // large buffer the CPU rewrites (a triple-buffered dynamic one:
@@ -10321,7 +10353,7 @@ void main()
                             narrow(r, constant);
                         if (r.size == 0 || std::any_of(copies, copies + copyCount, [&](const Range& c) { return c.base == r.base && c.size == r.size; }))
                             continue;
-                        if (g_eagerWrites && r.size <= kSnapshotMax && copyCount < 4 &&
+                        if (g_eagerWrites && (r.size <= kSnapshotMax || dynamicVertices(r.base, r.size)) && copyCount < 4 &&
                             !writewatch::GpuWritePending(r.base, r.size) && !writewatch::AnyGpuOwned(r.base, r.size))
                         {
                             copies[copyCount++] = r;
