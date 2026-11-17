@@ -26,6 +26,8 @@ the first time a new version starts (offline: it's built into the game).
 - Tire smoke and dust next to your car are drawn, and hidden behind the car as they should be.
 - Opponents no longer show through walls and hills.
 - No more single wrong frames ("blinks") in busy scenes with crowds and many cars.
+- No more dropped frame about once a second in races: the game no longer waits for the GPU
+  each time it refills its dynamic vertex buffers.
 
 ### Not there yet
 
