@@ -46,6 +46,7 @@ struct GuestThreadHandle : Waitable
     uint32_t id;
     std::atomic<bool> suspended;
     bool finished = false;  // SpeedBreaker: guarded by dispatcher::Lock()
+    uint32_t exitCode = 0;  // SpeedBreaker: its return value once finished (same lock)
 #ifdef USE_PTHREAD
     platform::Thread thread{};
 #else

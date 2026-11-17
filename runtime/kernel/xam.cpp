@@ -283,6 +283,21 @@ uint32_t XamContentCreateEnumerator(uint32_t dwUserIndex, uint32_t DeviceID, uin
     return 0;
 }
 
+// Achievements: none offline. An enumerator with nothing in it (the base's
+// Next: -1), so XamEnumerate answers ERROR_NO_MORE_FILES at once. The buffer
+// size is the console's for cItem entries (XACHIEVEMENT_DETAILS: 0x24 bytes;
+// the game allocates it, nothing is written into it). NFS: ProStreet asks at
+// boot (title 0, user 0, any XUID).
+uint32_t XamUserCreateAchievementEnumerator(uint32_t dwTitleId, uint32_t dwUserIndex, uint64_t xuid, uint32_t dwDetailFlags,
+    uint32_t dwStartingIndex, uint32_t cItem, be<uint32_t>* pcbBuffer, be<uint32_t>* phEnum)
+{
+    auto* enumerator = CreateKernelObject<XamEnumeratorBase>();
+    if (pcbBuffer)
+        *pcbBuffer = 0x24 * cItem;
+    *phEnum = GetKernelHandle(enumerator);
+    return 0;
+}
+
 uint32_t XamEnumerate(uint32_t hEnum, uint32_t dwFlags, void* pvBuffer, uint32_t cbBuffer, be<uint32_t>* pcItemsReturned, XXOVERLAPPED* pOverlapped)
 {
     auto* enumerator = GetKernelObject<XamEnumeratorBase>(hEnum);

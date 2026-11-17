@@ -135,10 +135,13 @@ static void GuestThreadFunc(GuestThreadHandle* hThread)
         SetHostThreadName(name);
     }
     hThread->suspended.wait(true);
-    GuestThread::Start(hThread->params);
-    // SpeedBreaker: signal waiters, then drop the thread's own reference.
+    const uint32_t exitCode = GuestThread::Start(hThread->params);
+    // SpeedBreaker: record the exit code (GetExitCodeThread, as the game's
+    // own XAPI asks: game/prostreet/xapi_threads.cpp), signal waiters, then
+    // drop the thread's own reference.
     {
         std::lock_guard lock(dispatcher::Lock());
+        hThread->exitCode = exitCode;
         hThread->finished = true;
         dispatcher::NotifyAllLocked();
     }

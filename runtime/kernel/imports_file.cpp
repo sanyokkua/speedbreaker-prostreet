@@ -416,6 +416,7 @@ enum : uint32_t
     XFileAllocationInformation = 19,
     XFileEndOfFileInformation = 20,
     XFileSectorInformation = 26,
+    XFileXctdCompressionInformation = 27,
     XFileIoPriorityInformation = 32,
     XFileNetworkOpenInformation = 34,
 };
@@ -472,6 +473,28 @@ uint32_t NtQueryInformationFile(uint32_t fileHandle, XIO_STATUS_BLOCK* iosb, uin
         *reinterpret_cast<be<uint32_t>*>(info) = 0;
         written = 4;
         break;
+    }
+    case XFileSectorInformation:
+    {
+        // The file's disc sector. Games use it only to tell files apart (to
+        // sort or look them up), so any number unique to the file does, as
+        // in Xenia: a hash of its path.
+        if (length < 4) return STATUS_INFO_LENGTH_MISMATCH;
+        const uint64_t h = std::hash<std::string>{}(file->path.string());
+        *reinterpret_cast<be<uint32_t>*>(info) = uint32_t(h ^ (h >> 32));
+        written = 4;
+        break;
+    }
+    case XFileXctdCompressionInformation:
+    {
+        // Whether the file is XCTD-compressed (NFS: ProStreet asks for each
+        // archive it opens). Xenia answers STATUS_INVALID_PARAMETER with a
+        // zeroed buffer, and games then read the file as it is: the disc's
+        // files are plain.
+        if (length < 4) return STATUS_INFO_LENGTH_MISMATCH;
+        memset(info, 0, length);
+        Complete(iosb, STATUS_INVALID_PARAMETER, 0);
+        return STATUS_INVALID_PARAMETER;
     }
     default:
         fprintf(stderr, "[file] NtQueryInformationFile: info class %u not supported yet\n", infoClass);

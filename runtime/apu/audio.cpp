@@ -537,6 +537,19 @@ uint32_t XAudioGetVoiceCategoryVolume(uint32_t category, be<float>* volume)
     return 0;
 }
 
+// The speaker configuration: XCONFIG's user audio flags (user category 3,
+// setting 0x0A), the same word ExGetXConfigSetting answers, as in Xenia.
+// NFS: ProStreet asks at boot.
+uint32_t ExGetXConfigSetting(uint16_t Category, uint16_t Setting, void* Buffer, uint16_t SizeOfBuffer, be<uint32_t>* RequiredSize);
+uint32_t XAudioGetSpeakerConfig(be<uint32_t>* config)
+{
+    be<uint32_t> flags = 0, size = 0;
+    ExGetXConfigSetting(3, 0x000A, &flags, sizeof(flags), &size);
+    *config = flags;
+    return 0;
+}
+
+GUEST_FUNCTION_HOOK(__imp__XAudioGetSpeakerConfig, XAudioGetSpeakerConfig);
 GUEST_FUNCTION_HOOK(__imp__XAudioRegisterRenderDriverClient, XAudioRegisterRenderDriverClient);
 GUEST_FUNCTION_HOOK(__imp__XAudioUnregisterRenderDriverClient, XAudioUnregisterRenderDriverClient);
 GUEST_FUNCTION_HOOK(__imp__XAudioSubmitRenderDriverFrame, XAudioSubmitRenderDriverFrame);
