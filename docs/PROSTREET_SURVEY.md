@@ -2,8 +2,8 @@
 
 This is the work-in-progress record of bringing *Need for Speed: ProStreet*
 (EA Black Box, 2007) to this tree as a third game, `SB_GAME=prostreet`. It
-covers the static survey (phase 2) and the first clean recompile (phase 3).
-Booting the game is the next round.
+covers the static survey, the first clean recompile, the boot (round 2) and
+the first graphics and threading fixes (round 3).
 
 All numbers come from the author's own USA disc. No game data is in the
 repository: `game-prostreet/` and `ppc-prostreet/` are gitignored.
@@ -148,6 +148,21 @@ a hang report:
 
 Most Wanted and Carbon never call these. Carbon, rebuilt from this tree,
 still boots and renders.
+
+## Graphics and threading (round 3): smoke, occlusion, flashes
+
+Found from play reports and `Cmd+D` draw logs (one frame's draws with
+their render state). Each fix is general, not a ProStreet address.
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| No tire smoke or dust near the player's car (distant opponents' dust drew) | ProStreet draws near particles in a quarter-size pass (320x180) whose depth is at EDRAM base 2000, inside the scene's 4x MSAA depth (base 1024, 1024 tiles). It never clears that depth itself: the scene's clear does, on the console. Here each layout is its own image, so it stayed at zero and every particle failed LEQUAL. | A depth clear also clears the other depth targets based inside the EDRAM tiles it covers (`ClearOverlappedDepth`, `gpu/renderer.cpp`). |
+| Smoke drew through the car; opponents showed through walls until the game culled them | Pixel shader depth export (`oDepth`, export 61) was parsed but never written. Three shaders use it: the particle pass rebuilds its depth from the scene's resolved depth (`ps_fdcbf02e693d08f7`), its composite restores the scene depth with ALWAYS (`ps_9f1db8741c340c92`), and `ps_de0a7e1e097a427a`. | `gl_FragDepth = clamp(o_depth.x, 0, 1)` in shaders that export depth (`gpu/shader_translator.cpp`). Each such shader is logged once. |
+| Single wrong frames ("blinks") in busy scenes: crowds, many cars. Not in empty areas, and at any internal resolution. | Lock-free handoffs between the game's threads rely on stores becoming visible in program order, as on the 360 and x86. ARM64 doesn't guarantee that. | `SB_GUEST_TSO`, on by default for ProStreet: guest loads are acquires and stores releases (`runtime/cpu/guest_tso.h`). A play test had no blinks, at the same 60 fps. Not yet narrowed to the handoff(s) that need it. |
+
+Ruled out on the way: tile skipping, scaled resolution (the front buffer
+never fell back to 1x in a race: `[front]` log lines), the shadow map, point
+sprites and memexport.
 
 ## Risks and next round
 

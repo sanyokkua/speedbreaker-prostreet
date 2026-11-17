@@ -29,6 +29,20 @@ target_include_directories(NfsmwRecompLib PUBLIC
 target_compile_options(NfsmwRecompLib PRIVATE
     -Wno-unused-label -Wno-unused-variable -Wno-unused-but-set-variable
     -fno-strict-aliasing)
+# SB_GUEST_TSO=ON (not for clang-cl): guest loads and stores ordered as on
+# x86 and the 360 (runtime/cpu/guest_tso.h), first of the force-includes so
+# its macros are the ones ppc_context.h keeps. On by default for ProStreet:
+# without it, busy race scenes (crowds, many cars) showed single wrong
+# frames on ARM64; with it they don't, at the same 60 fps.
+if(SB_GAME STREQUAL "prostreet")
+    set(SB_GUEST_TSO_DEFAULT ON)
+else()
+    set(SB_GUEST_TSO_DEFAULT OFF)
+endif()
+option(SB_GUEST_TSO "Order the recompiled code's guest memory accesses as on x86 (acquire loads, release stores)" ${SB_GUEST_TSO_DEFAULT})
+if(SB_GUEST_TSO AND NOT SB_MSVC_FRONTEND)
+    target_compile_options(NfsmwRecompLib BEFORE PRIVATE "SHELL:-include \"${ROOT}/runtime/cpu/guest_tso.h\"")
+endif()
 if(SB_MSVC_FRONTEND)
     # clang-cl has no -include: /FI, in the same order. The third, on
     # Windows only, aligns the guest's jmp_bufs for the CRT's setjmp

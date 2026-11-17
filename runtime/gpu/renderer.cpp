@@ -11947,6 +11947,26 @@ void main()
         }
         bool scaled = pc.tiled && !showTexture[0] && s_scaled.enabled && s_scaled.scale.Exact(width, height) &&
             ScaledRangeValid(pc.base, frontBytes);
+        // A front buffer shown at host resolution, then at 1x for a frame (or
+        // back): the 1x copy may be older. Logged with the reason (diagnosing
+        // ProStreet's one-frame flashes).
+        if (pc.tiled && !showTexture[0] && s_scaled.enabled)
+        {
+            static bool lastScaled = true;
+            static uint32_t flips = 0;
+            if (scaled != lastScaled && flips < 400)
+            {
+                flips++;
+                uint32_t bad = 0, firstBad = 0;
+                for (uint32_t page = pc.base >> 12; page <= (pc.base + frontBytes - 1) >> 12; page++)
+                    if (!ScaledPageValid(page) && bad++ == 0)
+                        firstBad = page << 12;
+                fprintf(stderr, "[front] frame %llu: %08X %ux%u at %s (exact %d, %u stale pages, first %08X)\n",
+                    (unsigned long long)s_frame, pc.base, width, height, scaled ? "host resolution" : "1x",
+                    int(s_scaled.scale.Exact(width, height)), bad, firstBad);
+            }
+            lastScaled = scaled;
+        }
         uint32_t outW = scaled ? s_scaled.scale.x.Size(width) : width, outH = scaled ? s_scaled.scale.y.Size(height) : height;
         const bool b = between != 0.0f;
         Image& front = scaled ? (b ? s_frontBetweenScaled : s_frontScaled) : (b ? s_frontBetween : s_front);
