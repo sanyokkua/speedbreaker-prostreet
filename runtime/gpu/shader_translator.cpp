@@ -1352,6 +1352,13 @@ void main()
             // shaders with kills, and pipelines with alpha test (ALPHA_TEST).
             if (result.usesKill)
                 g += "    if (killed) discard;\n";
+            // Depth export (oDepth, export 61) replaces the rasterised depth.
+            // ProStreet's quarter-size particle pass rebuilds its depth from
+            // the scene's resolved depth this way; without it the pass got
+            // the full-screen quad's flat depth and near smoke drew through
+            // cars and walls.
+            if (result.writesDepth)
+                g += "    gl_FragDepth = clamp(o_depth.x, 0.0, 1.0);\n";
             g += R"(#ifdef ALPHA_TEST
     // Alpha test (RB_COLORCONTROL): func 0 never ... 7 always.
     uint af = pc.alphaTest & 7u;

@@ -9532,6 +9532,8 @@ void main()
                     (unsigned long long)h);
             }
 #endif
+            if (slot->info.ok && slot->info.writesDepth)
+                fprintf(stderr, "[renderer] ps_%016llx exports depth\n", (unsigned long long)h);
             if (!slot->info.ok)
                 fprintf(stderr, "[renderer] %s_%016llx: translation failed: %s\n", type == 0 ? "vs" : "ps",
                     (unsigned long long)h, slot->info.error.c_str());
