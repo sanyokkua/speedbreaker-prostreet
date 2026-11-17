@@ -164,6 +164,35 @@ Ruled out on the way: tile skipping, scaled resolution (the front buffer
 never fell back to 1x in a race: `[front]` log lines), the shadow map, point
 sprites and memexport.
 
+## Feature parity (round 4)
+
+Carbon's game hooks, found again in ProStreet by fingerprinting Carbon's code
+(each site matches instruction for instruction; the evidence is in each
+file's header). Shared code: Carbon's `game/carbon/frame_time.cpp` and
+`d3d_waits.cpp` take their addresses as macros, and ProStreet's files include
+them with ProStreet's.
+
+| Feature | ProStreet sites | Notes |
+|---|---|---|
+| Game time in whole vblanks | main loop sub_825B6778, frame call 0x825B68A8 (GameFrameTime), quantiser sub_825CC498 (its call returns to 0x825B63B0), world sub_822A9E10 (WorldStepCount 0x822A9E98, WorldNoStep 0x822A9E64) | Same constants as Carbon. A smoke run: 0 frames without a world step. |
+| D3D GPU waits | hang check sub_8286B308, fence wait sub_82853E70; device +10896 / +10908 | The device grew 128 bytes. Waits back off instead of spinning. |
+| EA mixer budget | over-budget step sub_827F5860 (mixer 0x83073158) | Carbon's budget with the divisor baked into one float. |
+| Fill Screen (Hor+/Vert+) | UltrawideProjection 0x821DECCC (views 1, 2, 5, 6, 40), UltrawideFrontEnd 0x82284124, matrix cache 0x82BFD5C4, mirror/PIP sub_82276488 | On only while 3D views are drawn (VP6 movies have no aspect to patch, so they stay 16:9). |
+| Language | SetCurrentLanguage sub_824379D8 (boot call returns to 0x824372CC), speech lookup sub_8234D918 | 15 text languages on the disc; speech English only. |
+| Shadow Resolution | the 1600x1600 shadow map (base 48) | Offered, as in Most Wanted. |
+
+Not ported, and why:
+- **Nitrous light trails:** ProStreet's RenderFlares (sub_82698F20) has no
+  ring of three matrices, so its trails can't shrink at 60 fps.
+- **HDR highlights:** ProStreet's scene targets are 8-bit (format 0), so
+  there is no light above white to recover. HDR output is the presenter's.
+- **Movie pacing, split screen:** not wanted for now.
+
+Checked: the 5 dropped switch tables. Four were decoded again as inline
+tables; the fifth (0x824418F8) is unreferenced dead code whose switch the
+recompiler emitted correctly. The third depth-exporting shader
+(`ps_de0a7e1e097a427a`) is correct by construction since the depth-export fix.
+
 ## Risks and next round
 
 1. **Imports on the boot path.** Implement the new imports the boot actually

@@ -143,8 +143,11 @@ target_include_directories(SpeedBreaker PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/gene
 # CHANGELOG.md, from its "## v<version>" heading to the next "## " one,
 # compiled in (generated/whats_new.inc). An edit of CHANGELOG.md reconfigures.
 # This is NFS: Carbon's repository: CHANGELOG.md is Carbon's, and a Most Wanted
-# build (-DSB_GAME=mw) reads Most Wanted's, CHANGELOG-mw.md.
-if(SB_GAME STREQUAL "carbon" OR SB_GAME STREQUAL "prostreet")
+# build (-DSB_GAME=mw) reads Most Wanted's, CHANGELOG-mw.md, and a ProStreet
+# build (-DSB_GAME=prostreet) its own, CHANGELOG-prostreet.md.
+if(SB_GAME STREQUAL "prostreet")
+    set(SB_CHANGELOG ${CMAKE_SOURCE_DIR}/CHANGELOG-prostreet.md)
+elseif(SB_GAME STREQUAL "carbon")
     set(SB_CHANGELOG ${CMAKE_SOURCE_DIR}/CHANGELOG.md)
 else()
     set(SB_CHANGELOG ${CMAKE_SOURCE_DIR}/CHANGELOG-mw.md)
@@ -175,7 +178,7 @@ if(EXISTS ${SB_CHANGELOG})
     endif()
 endif()
 if(SB_WHATS_NEW STREQUAL "")
-    message(WARNING "CHANGELOG.md has no entry for v${CMAKE_PROJECT_VERSION}: this build shows no \"What's new\" note")
+    message(WARNING "${SB_CHANGELOG} has no entry for v${CMAKE_PROJECT_VERSION}: this build shows no \"What's new\" note")
 endif()
 string(FIND "${SB_WHATS_NEW}" ")sbnote\"" bad)
 if(bad GREATER_EQUAL 0)
