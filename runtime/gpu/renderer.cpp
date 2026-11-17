@@ -2400,7 +2400,7 @@ namespace gpu::renderer
                 video::FrameRegion(regionW, regionH);
                 s_renderScale = WantedRenderScale(setting, regionW, regionH);
             }
-#ifdef SB_GAME_CARBON
+#if defined(SB_GAME_CARBON) && !defined(SB_GAME_PROSTREET)
             // Carbon has no 1600x1600 sun shadow map for the setting to scale
             // (it isn't offered there: settings.cpp): 1x, always.
             s_shadowResolutionSetting = settings::kShadowResolutionDefault;
@@ -9086,9 +9086,10 @@ void main()
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
         }
 
-#ifndef SB_GAME_CARBON
+#if !defined(SB_GAME_CARBON) || defined(SB_GAME_PROSTREET)
         // Not in Carbon: no pitch-1600 depth target to remake there, only the
         // Flush, the pool drain and the resolve prewarm's hitch (~0.3 s).
+        // ProStreet has Most Wanted's 1600x1600 sun shadow map, so it has this.
         void ApplyShadowResolution(int32_t setting)
         {
             const auto start = std::chrono::steady_clock::now();
@@ -9169,7 +9170,7 @@ void main()
                 if (mips != s_loadMips)
                     ApplyMipmaps(mips);
             }
-#ifndef SB_GAME_CARBON
+#if !defined(SB_GAME_CARBON) || defined(SB_GAME_PROSTREET)
             const int32_t shadowSetting = settings::GetInt(settings::Id::ShadowResolution);
             if (shadowSetting != s_shadowResolutionSetting)
                 ApplyShadowResolution(shadowSetting);

@@ -165,6 +165,9 @@ GAMES = {
     'carbon': {'name': 'SpeedBreaker Carbon', 'id': 'local.speedbreaker.SpeedBreakerCarbon',
                'file': 'SpeedBreaker-Carbon', 'icon': 'AppIcon-carbon.png',
                'trademarks': 'Need for Speed and Need for Speed Carbon are trademarks of Electronic Arts'},
+    'prostreet': {'name': 'SpeedBreaker ProStreet', 'id': 'local.speedbreaker.SpeedBreakerProStreet',
+                  'file': 'SpeedBreaker-ProStreet', 'icon': 'AppIcon-prostreet.png',
+                  'trademarks': 'Need for Speed and Need for Speed ProStreet are trademarks of Electronic Arts'},
 }
 
 

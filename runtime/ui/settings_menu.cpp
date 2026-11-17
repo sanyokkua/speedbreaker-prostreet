@@ -1030,7 +1030,8 @@ namespace ui
                         if (category == Category::Advanced)
                         {
                             BugReportRow(valueWidth);
-                            UpdateRow(valueWidth);
+                            if (SB_HAS_RELEASES)
+                                UpdateRow(valueWidth);
                         }
                         ImGui::EndTable();
                     }

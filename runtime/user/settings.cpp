@@ -146,7 +146,7 @@ namespace settings
         // Carbon draws no such map (its car shadows are their own draws), so
         // the row would change nothing there but cost a hitch: not offered,
         // and the renderer keeps 1x (renderer.cpp).
-#ifdef SB_GAME_CARBON
+#if defined(SB_GAME_CARBON) && !defined(SB_GAME_PROSTREET)  // ProStreet has the 1600x1600 shadow map
         constexpr bool kShadowResolutionHidden = true;
 #else
         constexpr bool kShadowResolutionHidden = false;

@@ -34,7 +34,10 @@ namespace ui::theme
         return { float((rgb >> 16) & 0xFF) / 255.0f, float((rgb >> 8) & 0xFF) / 255.0f, float(rgb & 0xFF) / 255.0f };
     }
 
-#ifdef SB_GAME_CARBON
+#if defined(SB_GAME_PROSTREET)
+    constexpr Rgb kAccent = FromHex(0xF2B705);      // ProStreet's HUD yellow
+    constexpr Rgb kAccentFill = kAccent;
+#elif defined(SB_GAME_CARBON)
     constexpr Rgb kAccent = FromHex(0x48E0E0);      // strokes: Carbon's HUD teal
     constexpr Rgb kAccentFill = FromHex(0x80D0E0);  // fills: Carbon's menu frame
 #else

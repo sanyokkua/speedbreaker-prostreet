@@ -33,12 +33,13 @@
 // SB_WINDOWS_LOGS is where Windows' message boxes say the log is (the data
 // folder of user/paths.h kUserFolderName, as %LOCALAPPDATA% shows it).
 #if defined(SB_GAME_PROSTREET)
-// Work in progress (SB_GAME=prostreet): boots no further than the recompiled
-// code allows yet; no release, so no repository of its own to update from.
+// SB_GAME=prostreet: no published releases, so no Check for Updates
+// (SB_HAS_RELEASES 0 hides the row) and no repository to link to.
+#define SB_HAS_RELEASES 0
 #define SB_GAME_TITLE "NFS: ProStreet"
 #define SB_GAME_NAME "Need for Speed: ProStreet"
 #define SB_GAME_RELEASE "the USA Xbox 360 release (English and Spanish)"
-#define SB_GAME_AUTO_RESOLUTION "Auto: from the screen and the GPU (ProStreet takes Carbon's budget for now)."
+#define SB_GAME_AUTO_RESOLUTION "Auto: from the screen and the GPU (1440p: 1.5x on an integrated GPU such as a Mac's, 2x on a dedicated one)."
 #define SB_GAME_GAMMA_OFF "Off: the flatter picture, without the ramp."
 #define SB_GAME_UNSUPPORTED " Other editions of the game (other regions) aren't supported yet."
 #define SB_GAME_SUPPORTED_DISC "SpeedBreaker: ProStreet supports the USA release of Need for Speed: ProStreet. Other editions aren't supported yet."
@@ -75,4 +76,8 @@
 #define SB_WINDOWS_EXE "SpeedBreaker.exe"
 #define SB_WINDOWS_LOGS "%LOCALAPPDATA%\\SpeedBreaker\\logs"
 #define SB_IOS_APP_NAME "SpeedBreaker"
+#endif
+
+#ifndef SB_HAS_RELEASES
+#define SB_HAS_RELEASES 1  // Check for Updates asks SB_GITHUB_REPO's releases
 #endif

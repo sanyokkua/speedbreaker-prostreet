@@ -102,7 +102,7 @@ namespace install
         constexpr const Manifest* s_manifests[] = { &s_usa, &s_palEs };
 #endif
 
-#ifdef SB_GAME_CARBON
+#if defined(SB_GAME_CARBON) && !defined(SB_GAME_PROSTREET)
         // NFS: Carbon's standard USA edition: a different disc from the
         // Collector's Edition (its own default.xex, same title ID).
         constexpr KnownUnsupportedXex s_unsupported[] = {

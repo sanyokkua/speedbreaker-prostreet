@@ -6,7 +6,8 @@
 # right. No game artwork. Most Wanted's is amber with a red redline and a
 # burnt-orange glow, scripts/macos/AppIcon.png; --carbon draws SpeedBreaker
 # Carbon's, teal with a magenta redline and the title screen's purple glow,
-# scripts/macos/AppIcon-carbon.png. Both are kept in the repo so
+# scripts/macos/AppIcon-carbon.png; --prostreet SpeedBreaker ProStreet's, yellow
+# with a white redline and a red glow, scripts/macos/AppIcon-prostreet.png. Both are kept in the repo so
 # make_app.py needs no Pillow. The flags only try other looks:
 #   --corner=R,G,B,STRENGTH,RADIUS,DARK[,DX,DY]  the glow: its colour, STRENGTH
 #       0-1 at its origin, RADIUS the fraction of the icon it fades over, DARK
@@ -36,16 +37,24 @@ def flag(name, default):
 
 
 CARBON = '--carbon' in sys.argv
+PROSTREET = '--prostreet' in sys.argv
 args = [a for a in sys.argv[1:] if not a.startswith('--')]
-out = args[0] if args else ('AppIcon-carbon.png' if CARBON else 'AppIcon.png')
-# The settings menu's accent (ui/theme.h): Most Wanted's amber, Carbon's teal.
-AMBER = (72, 224, 224) if CARBON else (255, 168, 31)
-NEEDLE = (150, 240, 240) if CARBON else (255, 196, 92)
-RED = flag('redline', (205, 80, 215) if CARBON else (232, 64, 40))
+out = args[0] if args else ('AppIcon-carbon.png' if CARBON else 'AppIcon-prostreet.png' if PROSTREET else 'AppIcon.png')
+# The settings menu's accent (ui/theme.h): Most Wanted's amber, Carbon's teal,
+# ProStreet's HUD yellow (its redline white, its glow the asphalt-at-dusk red).
+if PROSTREET:
+    AMBER, NEEDLE = (242, 183, 5), (255, 220, 90)
+    RED = flag('redline', (245, 245, 245))
+    CORNER = flag('corner', (220, 50, 30, 0.55, 0.85, 1.0, -0.22, 0.18))
+    GLOW = flag('glow', None)
+else:
+    AMBER = (72, 224, 224) if CARBON else (255, 168, 31)
+    NEEDLE = (150, 240, 240) if CARBON else (255, 196, 92)
+    RED = flag('redline', (205, 80, 215) if CARBON else (232, 64, 40))
+    CORNER = flag('corner', (185, 60, 205, 0.75, 0.85, 1.0, -0.22, 0.18) if CARBON
+                  else (240, 110, 30, 0.55, 0.85, 1.0, -0.22, 0.18))
+    GLOW = flag('glow', (150, 40, 200, 0.35, 0.45) if CARBON else None)
 RED = AMBER if RED == 'none' else tuple(int(x) for x in RED)
-CORNER = flag('corner', (185, 60, 205, 0.75, 0.85, 1.0, -0.22, 0.18) if CARBON
-              else (240, 110, 30, 0.55, 0.85, 1.0, -0.22, 0.18))
-GLOW = flag('glow', (150, 40, 200, 0.35, 0.45) if CARBON else None)
 
 
 def rounded_mask(size, inset, radius):
