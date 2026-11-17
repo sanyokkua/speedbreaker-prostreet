@@ -1,0 +1,87 @@
+From 412e71072d543583a9e64e54a6f4e43977dca174 Mon Sep 17 00:00:00 2001
+From: SpeedBreaker ProStreet <prostreet@speedbreaker.invalid>
+Date: Tue, 17 Nov 2026 11:18:00 +0100
+Subject: [PATCH] NFS: ProStreet: vcmpgtuw(.), vpkuwus, vslo
+
+vcmpgtuw: unsigned word compare (xor the sign bit, signed compare).
+vpkuwus: unsigned word -> halfword pack with unsigned saturation (clamp to
+0xFFFF before packus, which treats its input as signed).
+vslo: whole-vector shift left by octets, count in bits 121:124 of vB, as a
+pshufb on the reversed layout (negative indices write zero).
+Tested by tests/instr/prostreet_*.s against an independent Python model.
+---
+ XenonRecomp/recompiler.cpp | 15 +++++++++++++++
+ XenonUtils/ppc_context.h   | 17 +++++++++++++++++
+ 2 files changed, 32 insertions(+)
+
+diff --git a/XenonRecomp/recompiler.cpp b/XenonRecomp/recompiler.cpp
+index a13f6f8..5fc0ffa 100644
+--- a/XenonRecomp/recompiler.cpp
++++ b/XenonRecomp/recompiler.cpp
+@@ -1924,6 +1924,12 @@ bool Recompiler::Recompile(
+             println("\t{}.setFromMask(simde_mm_load_si128((simde__m128i*){}.u8), 0xFFFF);", cr(6), v(insn.operands[0]));
+         break;
+ 
++    case PPC_INST_VCMPGTUW:
++        println("\tsimde_mm_store_si128((simde__m128i*){}.u8, simde_mm_cmpgt_epu32(simde_mm_load_si128((simde__m128i*){}.u32), simde_mm_load_si128((simde__m128i*){}.u32)));", v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
++        if (strchr(insn.opcode->name, '.'))
++            println("\t{}.setFromMask(simde_mm_load_ps({}.f32), 0xF);", cr(6), v(insn.operands[0]));
++        break;
++
+     case PPC_INST_VEXPTEFP:
+     case PPC_INST_VEXPTEFP128:
+         // TODO: vectorize
+@@ -2184,6 +2190,11 @@ bool Recompiler::Recompile(
+         println("\tsimde_mm_store_si128((simde__m128i*){}.u8, simde_mm_packus_epi16(simde_mm_min_epu16(simde_mm_load_si128((simde__m128i*){}.u16), simde_mm_set1_epi16(0xFF)), simde_mm_min_epu16(simde_mm_load_si128((simde__m128i*){}.u16), simde_mm_set1_epi16(0xFF))));", v(insn.operands[0]), v(insn.operands[2]), v(insn.operands[1]));
+         break;
+ 
++    case PPC_INST_VPKUWUS:
++        // Unsigned in, unsigned out: clamp to 0xFFFF first, since packus treats input as signed.
++        println("\tsimde_mm_store_si128((simde__m128i*){}.u16, simde_mm_packus_epi32(simde_mm_min_epu32(simde_mm_load_si128((simde__m128i*){}.u32), simde_mm_set1_epi32(0xFFFF)), simde_mm_min_epu32(simde_mm_load_si128((simde__m128i*){}.u32), simde_mm_set1_epi32(0xFFFF))));", v(insn.operands[0]), v(insn.operands[2]), v(insn.operands[1]));
++        break;
++
+     case PPC_INST_VCTUXS:
+     case PPC_INST_VCFPUXWS128:
+         printSetFlushMode(true);
+@@ -2275,6 +2286,10 @@ bool Recompiler::Recompile(
+         println("\tsimde_mm_store_si128((simde__m128i*){}.u8, simde_mm_alignr_epi8(simde_mm_load_si128((simde__m128i*){}.u8), simde_mm_load_si128((simde__m128i*){}.u8), {}));", v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]), 16 - insn.operands[3]);
+         break;
+ 
++    case PPC_INST_VSLO:
++        println("\tsimde_mm_store_si128((simde__m128i*){}.u8, simde_mm_vslo(simde_mm_load_si128((simde__m128i*){}.u8), simde_mm_load_si128((simde__m128i*){}.u8)));", v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
++        break;
++
+     case PPC_INST_VSLW:
+     case PPC_INST_VSLW128:
+         // TODO: vectorize, ensure endianness is correct
+diff --git a/XenonUtils/ppc_context.h b/XenonUtils/ppc_context.h
+index a681071..9af160b 100644
+--- a/XenonUtils/ppc_context.h
++++ b/XenonUtils/ppc_context.h
+@@ -869,6 +869,23 @@ inline simde__m128i simde_mm_cmpgt_epu16(simde__m128i a, simde__m128i b)
+     return simde_mm_cmpgt_epi16(simde_mm_xor_si128(a, c), simde_mm_xor_si128(b, c));
+ }
+ 
++inline simde__m128i simde_mm_cmpgt_epu32(simde__m128i a, simde__m128i b)
++{
++    simde__m128i c = simde_mm_set1_epi32(int(0x80000000));
++    return simde_mm_cmpgt_epi32(simde_mm_xor_si128(a, c), simde_mm_xor_si128(b, c));
++}
++
++// vslo: shift the whole vector left by octets, the count in bits 121:124 of b
++// (big-endian numbering: PPC byte 15, stored at u8[0] in the reversed layout).
++// PPC byte i comes from byte i + n; reversed, u8[j] comes from u8[j - n], and
++// a negative index (high bit set) makes pshufb write zero.
++inline simde__m128i simde_mm_vslo(simde__m128i a, simde__m128i b)
++{
++    int n = (simde_mm_cvtsi128_si32(b) >> 3) & 0xF;
++    simde__m128i index = simde_mm_sub_epi8(simde_mm_setr_epi8(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15), simde_mm_set1_epi8(char(n)));
++    return simde_mm_shuffle_epi8(a, index);
++}
++
+ inline simde__m128i simde_mm_vctsxs(simde__m128 src1)
+ {
+     simde__m128 xmm2 = simde_mm_cmpunord_ps(src1, src1);
+-- 
+2.56.1
+

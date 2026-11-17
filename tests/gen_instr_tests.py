@@ -5,10 +5,10 @@ Expected values come from an independent Python model of the PowerPC
 semantics (big-endian element order, as written in the tests), never from the
 recompiler, so a codegen bug can't agree with itself.
 
-    python3 tests/gen_instr_tests.py     # writes tests/instr/nfsmw_*.s and carbon_*.s
+    python3 tests/gen_instr_tests.py     # writes tests/instr/nfsmw_*.s, carbon_*.s, prostreet_*.s
 
 nfsmw_*: instructions Most Wanted needed; carbon_*: those NFS: Carbon added
-(XenonRecomp patch 0009). Each set has its own random stream, so adding one
+(XenonRecomp patch 0009); prostreet_*: those NFS: ProStreet added (patch 0010). Each set has its own random stream, so adding one
 never changes the other's files.
 """
 import os
@@ -235,10 +235,91 @@ def carbon_tests():
     write('dcbst', tests, 'carbon')
 
 
+def vslo_model(a, b):
+    """vslo: vA shifted left by octets; the count is bits 121:124 of vB (big-endian
+    bit numbering), i.e. (byte 15 >> 3) & 15. Zeros shift in."""
+    sh = (to_bytes(b)[15] >> 3) & 15
+    return from_bytes(to_bytes(a)[sh:] + bytes(sh))
+
+
+def prostreet_tests():
+    """Instructions NFS: ProStreet added (XenonRecomp patch 0010): vcmpgtuw(.),
+    vpkuwus, vslo. Its own random stream, as carbon_tests()."""
+    prng = random.Random(0x9505)
+
+    def rvec(size):
+        n, bits = 16 // size, size * 8
+        edges = [0, 1, (1 << bits) - 1, 1 << (bits - 1), (1 << (bits - 1)) - 1, 0xFFFF, 0x10000]
+        vals = [prng.choice(edges) & ((1 << bits) - 1) if prng.random() < 0.4 else prng.getrandbits(bits)
+                for _ in range(n)]
+        return pack(vals, size, False)
+
+    binops = {
+        'vcmpgtuw': compare(4, False, lambda x, y: x > y),
+        'vpkuwus': pack_op(4, False, False),
+    }
+    for name, model in binops.items():
+        tests = []
+        for _ in range(8):
+            a, b = rvec(4), rvec(4)
+            d = model(a, b)
+            tests.append(
+                f'  #_ REGISTER_IN v4 {vec(a)}\n'
+                f'  #_ REGISTER_IN v5 {vec(b)}\n'
+                f'  {name} v3, v4, v5\n'
+                f'  blr\n'
+                f'  #_ REGISTER_OUT v3 {vec(d)}\n'
+                f'  #_ REGISTER_OUT v4 {vec(a)}\n'
+                f'  #_ REGISTER_OUT v5 {vec(b)}\n')
+        write(name, tests, 'prostreet')
+
+    # vcmpgtuw.: cr6.lt = all true, cr6.eq = none true (r3 bits 0 and 1).
+    model = binops['vcmpgtuw']
+    big, small = [0xFFFFFFFF] * 4, [0] * 4
+    a = rvec(4)
+    cases = [(rvec(4), rvec(4)) for _ in range(4)] + [(a, a), (small, small), (big, small), (small, big),
+             ([0x80000000] * 4, [0x7FFFFFFF] * 4)]  # unsigned: 0x80000000 > 0x7FFFFFFF
+    tests = []
+    for a, b in cases:
+        d = model(a, b)
+        r3 = (1 if all(w == 0xFFFFFFFF for w in d) else 0) | (2 if all(w == 0 for w in d) else 0)
+        tests.append(
+            f'  #_ REGISTER_IN v4 {vec(a)}\n'
+            f'  #_ REGISTER_IN v5 {vec(b)}\n'
+            f'  #_ REGISTER_IN r3 0\n'
+            f'  vcmpgtuw. v3, v4, v5\n'
+            f'  bge cr6, .+8\n'
+            f'  ori r3, r3, 1\n'
+            f'  bne cr6, .+8\n'
+            f'  ori r3, r3, 2\n'
+            f'  blr\n'
+            f'  #_ REGISTER_OUT v3 {vec(d)}\n'
+            f'  #_ REGISTER_OUT r3 {r3}\n')
+    write('vcmpgtuw_rc', tests, 'prostreet')
+
+    # vslo: every shift count 0..15, plus random junk in vB's other bits
+    # (only bits 121:124 count).
+    tests = []
+    for sh in range(16):
+        a = [prng.getrandbits(32) for _ in range(4)]
+        b = [prng.getrandbits(32) for _ in range(4)]
+        b[3] = (b[3] & ~0x78) | (sh << 3)
+        d = vslo_model(a, b)
+        tests.append(
+            f'  #_ REGISTER_IN v4 {vec(a)}\n'
+            f'  #_ REGISTER_IN v5 {vec(b)}\n'
+            f'  vslo v3, v4, v5\n'
+            f'  blr\n'
+            f'  #_ REGISTER_OUT v3 {vec(d)}\n'
+            f'  #_ REGISTER_OUT v4 {vec(a)}\n'
+            f'  #_ REGISTER_OUT v5 {vec(b)}\n')
+    write('vslo', tests, 'prostreet')
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     for f in os.listdir(OUT):
-        if f.startswith('nfsmw_') or f.startswith('carbon_'):
+        if f.startswith(('nfsmw_', 'carbon_', 'prostreet_')):
             os.remove(os.path.join(OUT, f))
 
     for name, (model, size) in VECTOR_BINOPS.items():
@@ -363,8 +444,9 @@ def main():
     write('stfsu', tests)
 
     carbon_tests()
+    prostreet_tests()
 
-    print('wrote', sorted(f for f in os.listdir(OUT) if f.startswith('nfsmw_') or f.startswith('carbon_')))
+    print('wrote', sorted(f for f in os.listdir(OUT) if f.startswith(('nfsmw_', 'carbon_', 'prostreet_'))))
 
 
 if __name__ == '__main__':
