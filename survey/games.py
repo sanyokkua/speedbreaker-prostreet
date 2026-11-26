@@ -118,6 +118,10 @@ GAMES = {
         manual_bounds={
             0x823C37C8: 0x10,
             0x824BBC90: 0x28,
+            # Tree-iterator leaf (no .pdata) up to its only blr: split into three
+            # functions, its b to that blr (0x82A4DBEC) was dropped by
+            # XenonRecomp (FATAL with patch 0014).
+            0x82A4DBB8: 0xC0,
         },
     ),
 }
