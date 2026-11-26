@@ -755,6 +755,10 @@ namespace gpu::renderer
             double blackSec = 0;
             uint32_t blackDraws = 0, blackWaiting = 0, blackResolves = 0;  // the game's work for that frame
 #endif
+            // NFSMW_GLITCH_WATCH: the present whose front image this
+            // submission measures (its entry in s_glitch.host, else -1).
+            int32_t glitchEntry = -1;
+            uint64_t glitchFrame = 0;
         };
         // NFSMW_FENCE_EVENTS=0 disables mid-buffer fence publication.
         const bool s_fenceEvents = [] { const char* v = std::getenv("NFSMW_FENCE_EVENTS"); return !v || v[0] != '0'; }();
@@ -1183,6 +1187,65 @@ namespace gpu::renderer
         }
 #endif
 
+        // NFSMW_GLITCH_WATCH=1 (or =<threshold>; a diagnostic): one- and
+        // two-frame glitches found without frame dumps (which change the
+        // timing). Every present's front image is reduced on the GPU to a
+        // 32x18 grid of mean luma (8x8 samples a cell, 0-255); at completion
+        // a frame that differs from both neighbours while they agree (score
+        // = the smaller difference minus the neighbours' own, in mean luma
+        // per cell) is logged as [glitch] with its frame number: OotP's
+        // exploded skinned mesh scored ~23 in the owner's recording, movie
+        // flashes 2-8. Frame numbers are s_frame, as [guard-race] lines.
+        constexpr uint32_t kGlitchCells = 32 * 18;
+        struct GlitchWatch
+        {
+            bool on = false;
+            float threshold = 6.0f;
+            VkBuffer buffer = VK_NULL_HANDLE;
+            VkDeviceMemory memory = VK_NULL_HANDLE;
+            const volatile uint32_t* host = nullptr;
+            VkPipeline pipeline = VK_NULL_HANDLE;
+            VkPipelineLayout layout = VK_NULL_HANDLE;
+            VkDescriptorSetLayout setLayout = VK_NULL_HANDLE;
+            uint32_t next = 0;  // command processor
+            // Completion thread: the last four grids and their frames.
+            uint32_t grids[4][kGlitchCells] = {};
+            uint64_t frames[4] = {};
+            uint64_t have = 0, logged = 0;
+        };
+        GlitchWatch s_glitch;
+        constexpr uint32_t kGlitchEntries = 4 * kSlots;
+
+        float GlitchDiff(const uint32_t* a, const uint32_t* b)
+        {
+            uint64_t sum = 0;
+            for (uint32_t i = 0; i < kGlitchCells; i++)
+                sum += a[i] > b[i] ? a[i] - b[i] : b[i] - a[i];
+            return float(sum) / float(kGlitchCells);
+        }
+
+        // Completion thread: `sub` (which carries a measure) is done.
+        void GlitchHarvest(Submission& sub)
+        {
+            GlitchWatch& g = s_glitch;
+            const uint32_t at = uint32_t(g.have % 4);
+            for (uint32_t i = 0; i < kGlitchCells; i++)
+                g.grids[at][i] = g.host[uint32_t(sub.glitchEntry) * kGlitchCells + i];
+            g.frames[at] = sub.glitchFrame;
+            sub.glitchEntry = -1;
+            g.have++;
+            if (g.have < 4)
+                return;
+            auto grid = [&](uint64_t back) { return g.grids[(g.have - 1 - back) % 4]; };
+            auto frame = [&](uint64_t back) { return g.frames[(g.have - 1 - back) % 4]; };
+            // One frame (back 1) between back 2 and back 0; two (back 2, 1) between back 3 and 0.
+            const float one = std::min(GlitchDiff(grid(2), grid(1)), GlitchDiff(grid(1), grid(0))) - GlitchDiff(grid(2), grid(0));
+            const float two = std::min(GlitchDiff(grid(3), grid(2)), GlitchDiff(grid(1), grid(0))) - GlitchDiff(grid(3), grid(0));
+            if ((one >= g.threshold || two >= g.threshold) && g.logged++ < 1000)
+                fprintf(stderr, "[glitch] frame %llu%s: differs from both neighbours by %.1f (one frame) / %.1f (two frames)\n",
+                    (unsigned long long)frame(one >= two ? 1 : 2), one >= two ? "" : " (and the next)", one, two);
+        }
+
         void CompletionThread()
         {
 #ifdef __APPLE__
@@ -1285,6 +1348,8 @@ namespace gpu::renderer
                 if (sub.blackEntry >= 0)
                     BlackHarvest(sub);
 #endif
+                if (sub.glitchEntry >= 0)
+                    GlitchHarvest(sub);
                 {
                     // Writes run under the lock so QueueWrite can't append to
                     // a submission that is being retired.
@@ -8330,6 +8395,79 @@ void main()
         }
 #endif
 
+        const char* kGlitchGlsl = R"(#version 460
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(set = 0, binding = 0, rgba8) readonly uniform image2D frontImage;
+layout(std430, set = 0, binding = 1) buffer Grid { uint grid[]; };
+layout(push_constant) uniform P { uint width, height, entry; } p;
+shared uint s_sum;
+void main()
+{
+    if (gl_LocalInvocationIndex == 0u) s_sum = 0u;
+    barrier();
+    vec2 uv = (vec2(gl_WorkGroupID.xy) + (vec2(gl_LocalInvocationID.xy) + 0.5) / 8.0) / vec2(32.0, 18.0);
+    ivec2 at = clamp(ivec2(uv * vec2(p.width, p.height)), ivec2(0), ivec2(p.width, p.height) - 1);
+    vec3 c = imageLoad(frontImage, at).rgb;
+    atomicAdd(s_sum, uint(dot(c, vec3(0.299, 0.587, 0.114)) * 255.0 + 0.5));
+    barrier();
+    if (gl_LocalInvocationIndex == 0u)
+        grid[p.entry * 576u + gl_WorkGroupID.y * 32u + gl_WorkGroupID.x] = s_sum / 64u;
+}
+)";
+
+        void CreateGlitchWatch()
+        {
+            const char* v = std::getenv("NFSMW_GLITCH_WATCH");
+            if (!v || !*v || v[0] == '0')
+                return;
+            if (std::atof(v) > 1.0)
+                s_glitch.threshold = float(std::atof(v));
+            VkBufferCreateInfo bci{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+            bci.size = VkDeviceSize(kGlitchEntries) * kGlitchCells * sizeof(uint32_t);
+            bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+            Check(vkCreateBuffer(s_dev, &bci, nullptr, &s_glitch.buffer), "vkCreateBuffer(glitch watch)");
+            VkMemoryRequirements req;
+            vkGetBufferMemoryRequirements(s_dev, s_glitch.buffer, &req);
+            VkMemoryAllocateInfo mai{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+            mai.allocationSize = req.size;
+            mai.memoryTypeIndex = FindMemoryType(req.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+            Check(vkAllocateMemory(s_dev, &mai, nullptr, &s_glitch.memory), "vkAllocateMemory(glitch watch)");
+            vkBindBufferMemory(s_dev, s_glitch.buffer, s_glitch.memory, 0);
+            void* p;
+            Check(vkMapMemory(s_dev, s_glitch.memory, 0, VK_WHOLE_SIZE, 0, &p), "vkMapMemory(glitch watch)");
+            s_glitch.host = static_cast<const volatile uint32_t*>(p);
+            VkDescriptorSetLayoutBinding b[2] = {
+                { 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr },
+                { 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr },
+            };
+            CreateComputePipeline(kGlitchGlsl, b, 2, 3 * sizeof(uint32_t), s_glitch.setLayout, s_glitch.layout, s_glitch.pipeline);
+            s_glitch.on = true;
+            fprintf(stderr, "[glitch] NFSMW_GLITCH_WATCH: frames differing from both neighbours by %.1f or more are logged\n",
+                s_glitch.threshold);
+        }
+
+        void RecordGlitchMeasure(const Image& front, uint32_t width, uint32_t height)
+        {
+            const uint32_t entry = s_glitch.next++ % kGlitchEntries;
+            VkDescriptorImageInfo ii{ VK_NULL_HANDLE, front.view, VK_IMAGE_LAYOUT_GENERAL };
+            VkDescriptorBufferInfo bi{ s_glitch.buffer, 0, VK_WHOLE_SIZE };
+            VkWriteDescriptorSet w[2] = {
+                { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, VK_NULL_HANDLE, 0, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &ii, nullptr, nullptr },
+                { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, VK_NULL_HANDLE, 1, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, nullptr, &bi, nullptr },
+            };
+            uint32_t pc[3] = { width, height, entry };
+            s_stateEpoch++;
+            vkCmdBindPipeline(s_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, s_glitch.pipeline);
+            s_pushDescriptorSet(s_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, s_glitch.layout, 0, 2, w);
+            vkCmdPushConstants(s_cmd, s_glitch.layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), pc);
+            vkCmdDispatch(s_cmd, 32, 18, 1);
+            VkMemoryBarrier mb{ VK_STRUCTURE_TYPE_MEMORY_BARRIER, nullptr, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_HOST_READ_BIT };
+            vkCmdPipelineBarrier(s_cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 1, &mb, 0, nullptr, 0, nullptr);
+            Submission& sub = s_submissions[s_slot];
+            sub.glitchEntry = int32_t(entry);
+            sub.glitchFrame = s_frame;
+        }
+
         void CreateUntilePipeline()
         {
             VkDescriptorSetLayoutBinding b[2] = {
@@ -9451,6 +9589,7 @@ void main()
 #ifdef _WIN32
         CreateBlackCheck();
 #endif
+        CreateGlitchWatch();
         Flush();
         fprintf(stderr, "[renderer] ready: guest physical memory %s (%llu MB)\n",
             !s_shadowMode ? "imported" : s_shadowInVram ? "copied for the GPU, in VRAM" : "copied for the GPU, in host memory",
@@ -12144,6 +12283,8 @@ void main()
         if (s_black.on)
             RecordBlackProbe(front, outW, outH);
 #endif
+        if (s_glitch.on && !b)
+            RecordGlitchMeasure(front, outW, outH);
         SubmitRecorded(7);  // the presenter's blit comes later in queue order
         video::SubmitFrontImage(front.image, outW, outH, width, height, between, shift, target, floatImage, floatView);
 #ifdef SB_GAME_CARBON
@@ -12269,6 +12410,8 @@ void main()
             writewatch::SetWriterFrame(frame);
         }
         s_frame = frame;
+        if (!s_uploadLog)
+            writewatch::SetWriterFrame(frame);  // (NFSMW_GUARD_RACE's lines)
         if (s_zpdOn)
             ZpdOnSwap(frame);
         if (s_logShadowMap)
