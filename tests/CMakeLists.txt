@@ -74,6 +74,10 @@ sb_test(split_views_test ARGS ${RT}/gpu/renderer.cpp)
 # header only): Order of the Phoenix's 4x half-pitch scene clear; renderer.cpp is
 # read to check Draw applies it.
 sb_test(draw_clear_test ARGS ${RT}/gpu/renderer.cpp)
+# Rectangle lists in either Direct3D corner order cover their rectangle
+# (gpu/rect_list.h, header only; Half-Blood Prince's scene clear left its
+# lower-left half); the shader is read to check it applies the rule.
+sb_test(rect_list_test ARGS ${RT}/gpu/shader_translator.cpp)
 # Which controller is which player in split screen (hid/player_slots.h,
 # header only) and the game's split-screen test (game/split_screen.h);
 # input.cpp is read to check users 1-3 follow it.
