@@ -17,6 +17,7 @@
 #include "zpd_report.h"
 #include "depth24_glsl.h"
 #include "depth_only.h"
+#include "draw_clear.h"
 #include "render_scale.h"
 #include "shared_memory_glsl.h"
 #include "shadow_lend.h"
@@ -2132,6 +2133,8 @@ namespace gpu::renderer
             VkExtent2D cutReach{};
             bool cut = false;
             bool wholeArea = false;
+            // MSAA (RB_SURFACE_INFO) of the last draw into it (PropagateDrawClear).
+            uint32_t msaa = 0;
         };
         std::unordered_map<uint64_t, std::unique_ptr<RenderTarget>> s_targets;
 
@@ -5945,6 +5948,67 @@ void main()
                 LogOnce(0x4100 + (t->base & 0x7FF), "depth clear at base %u (pitch %u) also clears the depth target at base %u (pitch %u)",
                     cleared->base, pitch, t->base, t->pitch);
                 ClearRect(t, { 0, 0, int32_t(t->guestWidth), int32_t(t->guestHeight) });
+            }
+        }
+
+        // A clear drawn as a rectangle (gpu/draw_clear.h) into `src` with
+        // `msaa`, over `r` (its guest pixels), also fills the other layouts
+        // of the same EDRAM: every target at its base, of its format, whose
+        // tile rows are its rows. The value is copied from what the draw
+        // wrote (a scaled blit: one value, so exact). Order of the Phoenix
+        // clears its 1x scene through a 4x half-pitch rectangle each frame.
+        void PropagateDrawClear(RenderTarget* src, uint32_t msaa, bool stencil, gpu::draw_clear::Rect r)
+        {
+            namespace dc = gpu::draw_clear;
+            r.x1 = std::min(r.x1, int32_t(src->guestWidth));
+            r.y1 = std::min(r.y1, int32_t(src->guestHeight));
+            if (r.x1 <= r.x0 || r.y1 <= r.y0)
+                return;
+            const bool is64 = !src->depth && Is64bpp(src->format);
+            for (auto& [key, slot] : s_targets)
+            {
+                RenderTarget* t = slot.get();
+                if (!t || t == src || t->depth != src->depth || t->base != src->base || t->vkFormat != src->vkFormat ||
+                    !dc::SameRows(src->pitch, msaa, t->pitch, t->msaa, is64))
+                    continue;
+                dc::Rect tr = dc::MapRect(r, msaa, t->msaa);
+                tr.x1 = std::min(tr.x1, int32_t(t->guestWidth));
+                tr.y1 = std::min(tr.y1, int32_t(t->guestHeight));
+                if (tr.x1 <= tr.x0 || tr.y1 <= tr.y0)
+                    continue;
+                VkFormatProperties fp{};
+                vkGetPhysicalDeviceFormatProperties(s_vk->physical, t->vkFormat, &fp);
+                constexpr VkFormatFeatureFlags kBlit = VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT;
+                if ((fp.optimalTilingFeatures & kBlit) != kBlit)
+                {
+                    LogOnce(0x4200 + uint32_t(t->vkFormat), "draw clear at base %u (pitch %u, msaa %u): format %d can't be blitted, "
+                        "the target at pitch %u keeps its contents", src->base, src->pitch, msaa, int(t->vkFormat), t->pitch);
+                    continue;
+                }
+                LogOnce((0x43ull << 56) | (uint64_t(t->base) << 24) | (uint64_t(t->pitch) << 4) | (uint64_t(src->pitch) << 40) |
+                    uint64_t(t->depth), "draw clear at base %u (pitch %u, msaa %u) also clears the %s target at pitch %u (msaa %u)",
+                    src->base, src->pitch, msaa, t->depth ? "depth" : "colour", t->pitch, t->msaa);
+                EndPass();
+                FlushPendingClears(src);
+                FlushPendingClears(t);
+                if (t->shared)
+                    LendTargetWrite(t, false);
+                Begin();
+                FullBarrier();
+                const VkRect2D s = HostRect(src->scale, r.x0, r.y0, r.x1, r.y1);
+                const VkRect2D d = HostRect(t->scale, tr.x0, tr.y0, tr.x1, tr.y1);
+                VkImageBlit blit{};
+                const VkImageAspectFlags aspect = t->depth ? VK_IMAGE_ASPECT_DEPTH_BIT | (stencil ? VK_IMAGE_ASPECT_STENCIL_BIT : 0)
+                                                           : VK_IMAGE_ASPECT_COLOR_BIT;
+                blit.srcSubresource = { aspect, 0, 0, 1 };
+                blit.dstSubresource = { aspect, 0, 0, 1 };
+                blit.srcOffsets[0] = { s.offset.x, s.offset.y, 0 };
+                blit.srcOffsets[1] = { s.offset.x + int32_t(s.extent.width), s.offset.y + int32_t(s.extent.height), 1 };
+                blit.dstOffsets[0] = { d.offset.x, d.offset.y, 0 };
+                blit.dstOffsets[1] = { d.offset.x + int32_t(d.extent.width), d.offset.y + int32_t(d.extent.height), 1 };
+                vkCmdBlitImage(s_cmd, src->image.image, VK_IMAGE_LAYOUT_GENERAL, t->image.image, VK_IMAGE_LAYOUT_GENERAL, 1, &blit,
+                    VK_FILTER_NEAREST);
+                FullBarrier();
             }
         }
 
@@ -10010,6 +10074,29 @@ void main()
             auto di = Reg<reg::RB_DEPTH_INFO>();
             depth = GetTarget(di.depth_base, uint32_t(di.depth_format), true, pitch);
         }
+        for (RenderTarget* rt : { color[0], color[1], color[2], color[3], depth })
+            if (rt)
+                rt->msaa = uint32_t(surface.msaa_samples);
+        // A clear drawn as a rectangle: also into the other layouts of its
+        // EDRAM, after the draw (PropagateDrawClear).
+        gpu::draw_clear::Cleared drawClear;
+        {
+            gpu::draw_clear::Draw dd;
+            dd.rectangleList = initiator.prim_type == xenos::PrimitiveType::kRectangleList;
+            dd.pixelShaderSamples = (s_ps->info.texture2DMask | s_ps->info.texture3DMask | s_ps->info.textureCubeMask) != 0;
+            dd.pixelShaderKills = s_ps->info.usesKill;
+            dd.pixelShaderWritesDepth = s_ps->info.writesDepth;
+            dd.alphaTest = Reg<reg::RB_COLORCONTROL>().alpha_test_enable;
+            dd.colorWriteMask = writeMask;
+            static const uint32_t blendRegs[4] = { XE_GPU_REG_RB_BLENDCONTROL0, XE_GPU_REG_RB_BLENDCONTROL1,
+                XE_GPU_REG_RB_BLENDCONTROL2, XE_GPU_REG_RB_BLENDCONTROL3 };
+            for (uint32_t i = 0; i < 4; i++)
+                dd.blendControl[i] = s_regs[blendRegs[i]];
+            dd.depthAttached = depth != nullptr;
+            dd.depthControl = depthControl.value;
+            dd.stencilWriteMask = Reg<reg::RB_STENCILREFMASK>().stencilwritemask;
+            drawClear = gpu::draw_clear::Classify(dd);
+        }
         if (!depth && writeMask == 0)
         {
             // Nothing visible (memexport-only draws are not supported yet):
@@ -11861,6 +11948,25 @@ void main()
                 else
                     vkCmdDraw(s_cmd, vertexCount, 1, 0, 0);
             }
+        }
+        if (drawClear.Any())
+        {
+            // What it covered: its scissor, inside its viewport when it has
+            // one (a pixel is in when its centre is).
+            gpu::draw_clear::Rect r{ x0, y0, x1, y1 };
+            if ((vte.value & 0xF) == 0xF && !clipCntl.clip_disable)
+            {
+                auto edge = [](float v) { return int32_t(std::clamp(std::ceil(v - 0.5f), -16384.0f, 16384.0f)); };
+                r.x0 = std::max(r.x0, edge(ox - std::fabs(sx)));
+                r.x1 = std::min(r.x1, edge(ox + std::fabs(sx)));
+                r.y0 = std::max(r.y0, edge(oy - std::fabs(sy)));
+                r.y1 = std::min(r.y1, edge(oy + std::fabs(sy)));
+            }
+            for (uint32_t i = 0; i < 4; i++)
+                if (color[i] && ((drawClear.colorTargets >> i) & 1) && !((adoptedColor >> i) & 1))
+                    PropagateDrawClear(color[i], uint32_t(surface.msaa_samples), false, r);
+            if (depth && drawClear.depth && !adoptedDepth)
+                PropagateDrawClear(depth, uint32_t(surface.msaa_samples), drawClear.stencil, r);
         }
         if (s_submitAfterDraw)
         {

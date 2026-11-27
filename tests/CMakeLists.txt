@@ -70,6 +70,10 @@ sb_test(render_scale_test ARGS ${RT}/gpu/renderer.cpp)
 # only): each cut to its own rows at 1x, 1.5x, 2x, 3x and Vert+'s taller y
 # scales, meeting exactly; renderer.cpp is read to check it applies the rules.
 sb_test(split_views_test ARGS ${RT}/gpu/renderer.cpp)
+# Clears drawn as rectangles reach every layout of their EDRAM (gpu/draw_clear.h,
+# header only): Order of the Phoenix's 4x half-pitch scene clear; renderer.cpp is
+# read to check Draw applies it.
+sb_test(draw_clear_test ARGS ${RT}/gpu/renderer.cpp)
 # Which controller is which player in split screen (hid/player_slots.h,
 # header only) and the game's split-screen test (game/split_screen.h);
 # input.cpp is read to check users 1-3 follow it.
