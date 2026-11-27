@@ -225,6 +225,26 @@ in the XDK/XAPI library (0x82A34FE4-0x82A6C544):
 Result: 0 FATAL, 0 `// ERROR` markers, 61 bogus or fragment function starts gone (none
 referenced by the runtime or the generated code), no new ones.
 
+## Round 6 (2026-11-27, v0.1.1): fixes from the HBP port
+
+The Half-Blood Prince port (`hp6-hbp-x360-port`, from the OotP tree) found three more general
+runtime bugs; all are in, none changed what ProStreet shows. Runs: 240 s each, a throwaway
+`HOME`, the disc extracted fresh, a new career into the first race (`NFSMW_INPUT_SCRIPT=`
+`20-90/4:START,93:LR,95:A,100-150/2:A,121-131/10:START,155~470:RT`),
+`NFSMW_GLITCH_WATCH=1`. A: the build before (43f7d54); B: the fixes with
+`NFSMW_TILE_PREDICATE=0`; C: the fixes. All three: no crash or hang, `[perf]` at 60.0 fps in
+100 of 115 / 103 of 115 / 102 of 118 lines, the same 7 `[glitch]` frames at the same scripted
+moments (scores -92.4, -80.5, 14.2, -21.0, -20.7, -22.2, -14.8 in A; C one more, 41.5, at a
+menu change), menus and the race look the same in shots at the same times.
+
+| Fix | ProStreet evidence | Taken |
+|---|---|---|
+| Wait order (`kernel/wait_queue.h`): a semaphore's count or an auto-reset event's signal goes to the threads already waiting, oldest first | boots, menus, saves and races as before | yes (general kernel bug) |
+| Rectangle lists in both corner orders (`gpu/rect_list.h`) + `draw_clear.h` `EdramBounds` | menus, the race and the drawn clears look the same | yes |
+| Predicated tiling with per-tile bin masks (`gpu/tile_predicate.h`) | `NFSMW_LOG_PREDICATE=1`: three tiles (selects `80000003`, `C`, `30`); scene draws carry mask `FFFFFFFF` in tile 0 and `8000003F` in tiles 1 and 2; masks `3`, `C`, `30` are each tile's own copy (about 15 draws a frame each). Draws only the new rule runs: 0 | yes (latent here), `NFSMW_TILE_PREDICATE=0` turns it off |
+
+`ctest -j3`: 102 of 102 passed.
+
 ## Risks and next round
 
 1. **Imports on the boot path.** Implement the new imports the boot actually

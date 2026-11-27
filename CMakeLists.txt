@@ -94,7 +94,7 @@ message(STATUS "SpeedBreaker game: ${SB_GAME}")
 # (runtime/CMakeLists.txt).
 set(SB_VERSION_MW 0.2.1)
 set(SB_VERSION_CARBON 0.1.3)
-set(SB_VERSION_PROSTREET 0.1.0)
+set(SB_VERSION_PROSTREET 0.1.1)
 if(SB_GAME STREQUAL "carbon")
     set(SB_VERSION ${SB_VERSION_CARBON})
 elseif(SB_GAME STREQUAL "prostreet")
