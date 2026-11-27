@@ -14,7 +14,7 @@ exec(open('survey/classify_switches.py').read().split("tables = sorted")[0])
 # entries (they appear in the mapping too), so reruns give the same answer.
 CFG = G['config']
 _cfg = open(CFG).read()
-_configured = set(int(x, 16) for x in re.findall(r'0x([0-9A-F]+)', _cfg.split('secondary_entries = [')[1].split(']')[0])) \
+_configured = set(int(x, 16) for x in re.findall(r'(?m)^\s*0x([0-9A-F]+),', _cfg.split('secondary_entries = [')[1].split(']')[0])) \
     if 'secondary_entries = [' in _cfg else set()
 fnstarts = set(int(x, 16) for x in re.findall(r'\{ 0x([0-9A-F]+),', open(G['ppc'] + '/ppc_func_mapping.cpp').read())) - _configured
 labels = set()

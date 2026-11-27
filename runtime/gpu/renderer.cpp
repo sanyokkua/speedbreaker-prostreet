@@ -11949,7 +11949,9 @@ void main()
                     vkCmdDraw(s_cmd, vertexCount, 1, 0, 0);
             }
         }
-        if (drawClear.Any())
+        // NFSMW_DRAW_CLEAR=0: drawn clears stay in their own layout (A/B).
+        static const bool s_drawClearOn = [] { const char* v = std::getenv("NFSMW_DRAW_CLEAR"); return !v || v[0] != '0'; }();
+        if (s_drawClearOn && drawClear.Any())
         {
             // What it covered: its scissor, inside its viewport when it has
             // one (a pixel is in when its centre is).
