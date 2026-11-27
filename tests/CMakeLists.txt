@@ -78,6 +78,11 @@ sb_test(draw_clear_test ARGS ${RT}/gpu/renderer.cpp)
 # (gpu/rect_list.h, header only; Half-Blood Prince's scene clear left its
 # lower-left half); the shader is read to check it applies the rule.
 sb_test(rect_list_test ARGS ${RT}/gpu/shader_translator.cpp)
+# Predicated tiling drawn untiled (gpu/tile_predicate.h, header only): a draw
+# whose bin mask is only a later tile's runs in tile 0 (Half-Blood Prince's
+# right-half objects went missing); command_processor.cpp and renderer.cpp
+# are read to check they apply it.
+sb_test(tile_predicate_test ARGS ${RT}/gpu/command_processor.cpp ${RT}/gpu/renderer.cpp)
 # Which controller is which player in split screen (hid/player_slots.h,
 # header only) and the game's split-screen test (game/split_screen.h);
 # input.cpp is read to check users 1-3 follow it.
