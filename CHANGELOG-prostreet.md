@@ -5,28 +5,8 @@ the first time a new version starts (offline: it's built into the game).
 
 ## v0.1.1
 
-### Fixed
-
-- Fixes found while porting the Harry Potter Xbox 360 games, which run on the same runtime. None
-  was seen to change ProStreet; each makes it behave more like the console:
-  - Threads waiting for the same signal get it in the order they started waiting, as on the
-    console (Half-Blood Prince froze at its first logo without this).
-  - Rectangles the game draws to clear or copy the screen are filled whichever corner it gives
-    first, and a clear reaches only the video memory the console's would.
-  - Objects the game marks for only part of the screen are drawn (they blinked or vanished in
-    Half-Blood Prince). ProStreet marks its objects for the whole screen.
-  - The game's code is translated more exactly: 27 branches that were left out of the translated
-    code, in the console's system library (exception handling and one list helper), are now in.
-  - Clearing the screen now also clears the same video memory seen in another layout.
-  - The memory guard no longer lets the game rewrite vertex data that the GPU has yet to read
-    (one-frame "exploding" models in Order of the Phoenix).
-  - A system-settings answer fixed (video region and country); ProStreet doesn't ask for those.
-
-### For testers
-
-A/B switches (environment variables, 0 = the old behaviour): `NFSMW_DRAW_CLEAR`,
-`NFSMW_GUARD_NEIGHBOURS`, `NFSMW_TILE_PREDICATE`. Diagnostics: `NFSMW_GLITCH_WATCH=1`,
-`NFSMW_GUARD_RACE=1`, `NFSMW_LOG_PREDICATE=1`.
+- Updated the port's runtime and code translation tools to the latest version for better stability. No visible
+  changes in the game.
 
 ## v0.1.0
 
