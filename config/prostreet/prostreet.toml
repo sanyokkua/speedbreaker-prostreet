@@ -1,6 +1,6 @@
 # XenonRecomp config for NFS: ProStreet (Xbox 360, USA, En/Es)
 # default.xex SHA-256 4f8b623a2a1ed06555b57da4e70411574ac962bce4b81bb100629ecc518275c2
-# Paths are relative to this file. Needs XenonRecomp with patch 0009+.
+# Paths are relative to this file. Needs XenonRecomp with patch 0014+.
 #
 # Regenerate the generated blocks and switch tables (from the repo root):
 #   tools/XenonRecomp/build/XenonAnalyse/XenonAnalyse game-prostreet/files/default.xex game-prostreet/survey/switch_tables.raw.toml
@@ -8,6 +8,7 @@
 #   (recompile, then) SB_GAME=prostreet python3 survey/find_missing_tables.py > config/prostreet/switch_tables_inline.toml
 #   SB_GAME=prostreet python3 survey/fix_switch_tables.py
 #   SB_GAME=prostreet python3 survey/leaf_switch_bounds.py --write
+#   SB_GAME=prostreet python3 survey/eh_data_ranges.py --write
 #   (recompile, then) SB_GAME=prostreet python3 survey/find_entry_points.py --write
 
 [main]

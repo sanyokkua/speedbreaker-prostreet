@@ -193,6 +193,38 @@ tables; the fifth (0x824418F8) is unreferenced dead code whose switch the
 recompiler emitted correctly. The third depth-exporting shader
 (`ps_de0a7e1e097a427a`) is correct by construction since the depth-export fix.
 
+## Round 5 (2026-11-27): fixes from the OotP port
+
+The Harry Potter: Order of the Phoenix port (`hp5-ootp-x360-port`, built from Undercover's
+copy of this tree) found general runtime and XenonRecomp bugs. Each was checked on ProStreet
+(2x, a throwaway `HOME`, the first career race, driving with RT held) before it was taken.
+
+| Fix | ProStreet evidence | Taken |
+|---|---|---|
+| XenonRecomp 0011-0014; a branch to an address that starts no function is FATAL (0014) | 27 FATAL = the released build's 27 `// ERROR` drops (below) | yes, then 0 FATAL |
+| `ExGetXConfigSetting`: AV region fell into the user category; `USER_COUNTRY` is 1 byte | ProStreet asks only for category 3 settings 0x0009 and 0x000A (`[xconfig]` log) | yes (general kernel bug, no effect here) |
+| Write watch: wait for GPU reads of the other guest pages before opening a 16 KB host page | Old rule (`NFSMW_GUARD_NEIGHBOURS=0`): 161 guest pages opened with a GPU read pending, **0 changed while open** (`NFSMW_GUARD_RACE=1`), 0 glitches (`NFSMW_GLITCH_WATCH=1`). New: 206 waits, 0 gave up, 0 glitches; 43.5 against 44.5 fps, guard stalls the same | yes (same code, latent here) |
+| `PropagateDrawClear` (`gpu/draw_clear.h`): a 4x MSAA clear rectangle also clears the aliased 1x layouts | Fires every frame: colour base 0 and depth base 1312 at pitch 640 over 1280, depth base 48 at pitch 800 over 1600 (~16,000 by frame 14,600); no visible difference, 45.6 fps | yes, with `NFSMW_DRAW_CLEAR=0` to turn it off (A/B) |
+| Edge snap (`gpu/edge_snap.h`): a light line on the top/left edge at 2x/3x | None at 2x: menus row 0 108.3 / row 1 108.4, column 0 137.1 / column 1 137.4, the same as 1x; black frames 0.0. The title movie's darker row 0 (78 against 113) is in the 1x run too | no |
+
+**What the 27 dropped branches were.** With 0014 the config gave 27 FATAL to 17 targets, all
+in the XDK/XAPI library (0x82A34FE4-0x82A6C544):
+- 25 sat in **bogus functions made of the 8 bytes before each C++ exception-handling function**
+  (the language handler's address and its data; the function's `.pdata` entry has the
+  ExceptionFlag). XenonRecomp's leftover scan reached those bytes first, decoded them as code
+  and ran on into the real function (`sub_82A6BD48` over the real `sub_82A6BD50`), cutting
+  fragments after it (`sub_82A6C3D0`, `sub_82A6C408`, ...). The real functions had no drop;
+  nothing called the bogus ones. `survey/eh_data_ranges.py` writes the 59 headers as
+  `data_ranges` (patch 0011). `find_entry_points.py` then keeps 8 `__try` scope-table handlers
+  callable (until then function starts only through the split). Its parse of the configured list
+  also read the `in .pdata fn 0x...` comment addresses (Undercover's finding); fixed, same 15 entries.
+- 2 in a tree-iterator leaf at 0x82A4DBB8 (no `.pdata`) split into three functions: its `b` to
+  its own `blr` (r3 already set) became a `return` (same effect), and a dead `b` after it.
+  Manual bounds 0x82A4DBB8, 0xC0 bytes (`survey/games.py`).
+
+Result: 0 FATAL, 0 `// ERROR` markers, 61 bogus or fragment function starts gone (none
+referenced by the runtime or the generated code), no new ones.
+
 ## Risks and next round
 
 1. **Imports on the boot path.** Implement the new imports the boot actually

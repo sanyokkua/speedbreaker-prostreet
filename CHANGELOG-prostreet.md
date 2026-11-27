@@ -3,6 +3,20 @@
 What changed in each SpeedBreaker: ProStreet build, newest first. The game shows the entry once,
 the first time a new version starts (offline: it's built into the game).
 
+## Unreleased
+
+### Fixed
+
+- Fixes found in the Harry Potter: Order of the Phoenix port, which runs on the same runtime:
+  - The game's code is translated more exactly: 27 branches that were left out of the translated
+    code, in the console's system library (exception handling and one list helper), are now in.
+    None was seen to cause a problem.
+  - Clearing the screen now also clears the same video memory seen in another layout, as on the
+    console.
+  - The memory guard no longer lets the game rewrite vertex data that the GPU has yet to read
+    (the cause of one-frame "exploding" models in Order of the Phoenix; not seen in ProStreet).
+  - A system-settings answer fixed (video region and country); ProStreet doesn't ask for those.
+
 ## v0.1.0
 
 ### What's new
