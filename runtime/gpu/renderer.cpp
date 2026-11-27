@@ -12,6 +12,7 @@
 #include "covers.h"
 #include "edge_bars.h"
 #include "memory_plan.h"
+#include "param_gen.h"
 #include "pipeline_cache_header.h"
 #include "pipeline_wait_budget.h"
 #include "scaler.h"
@@ -1980,9 +1981,9 @@ namespace gpu::renderer
             return vs.module;
         }
 
-        VkShaderModule PixelVariant(Shader& ps, uint32_t outputs, uint32_t inputs, bool alphaTest)
+        VkShaderModule PixelVariant(Shader& ps, uint32_t outputs, uint32_t inputs, bool alphaTest, uint32_t paramGen)
         {
-            uint32_t key = (outputs & 0xF) | ((inputs & 0xFFFF) << 4) | (alphaTest ? 1u << 20 : 0);
+            uint32_t key = (outputs & 0xF) | ((inputs & 0xFFFF) << 4) | (alphaTest ? 1u << 20 : 0) | ((paramGen & 0xFF) << 21);
             std::lock_guard lock(ps.compileMutex);
             auto it = ps.variants.find(key);
             if (it != ps.variants.end())
@@ -1996,6 +1997,8 @@ namespace gpu::renderer
                     preamble += std::format("#define IN{}\n", i);
             if (alphaTest)
                 preamble += "#define ALPHA_TEST\n";
+            if (paramGen != gpu::param_gen::kOff)
+                preamble += std::format("#define PARAM_GEN {}\n", paramGen);
             std::string log;
             auto spirv = CompileGlsl(ps.info.glsl, GLSLANG_STAGE_FRAGMENT, log, preamble);
             VkShaderModule module = VK_NULL_HANDLE;
@@ -2044,7 +2047,8 @@ namespace gpu::renderer
             float alphaRef;
             uint32_t flags;
             float posScale[4];
-            uint32_t vfRedirect[4][4];  // guest start, size, ring offset, 0 (vertex data snapshots)
+            uint32_t vfRedirect[4][4];  // guest start, size, ring offset (vertex data snapshots); [0][3], [1][3]:
+                                        // guest pixels per host pixel in x, y as float bits (gpu/param_gen.h)
             uint32_t constRing;         // the constants' ring offset, for relative reads (constRel)
         };
         static_assert(sizeof(DrawConstants) == 116);
@@ -3079,7 +3083,7 @@ namespace gpu::renderer
             uint32_t colorMask;      // 4 bits per target
             uint32_t depthControl;   // RB_DEPTHCONTROL (0 without a depth target, or one attached for the pass only)
             uint32_t raster;         // cull | front CW << 2 | depth clamp << 3 | depth bias << 4
-            uint32_t pad;
+            uint32_t paramGen;       // the pixel shader's parameter register (gpu/param_gen.h), kOff = none
 
             bool operator==(const PipelineKey& o) const { return memcmp(this, &o, sizeof(*this)) == 0; }
         };
@@ -3151,7 +3155,7 @@ namespace gpu::renderer
                     outputs |= 1u << i;
             uint32_t psRegs = std::min(16u, ps.info.registerCount);
             uint32_t inputs = vs.info.interpolatorMask & ((1u << psRegs) - 1);
-            VkShaderModule psModule = PixelVariant(ps, outputs, inputs, (key.raster >> 5) & 1);
+            VkShaderModule psModule = PixelVariant(ps, outputs, inputs, (key.raster >> 5) & 1, key.paramGen);
             if (!psModule)
                 return VK_NULL_HANDLE;
             stages[1] = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0, VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -10446,6 +10450,12 @@ void main()
             gpu::RunsGuestPixelShader(edramMode, s_depthOnlyGuestPs);
         key.raster = cull | (modeCntl.face ? 4u : 0u) | (clipCntl.clip_disable ? 8u : 0u) | (depthBias ? 16u : 0u) |
             (alphaTest ? 32u : 0u);
+        // ps_param_gen (vPos, VFACE): only for the guest's pixel shader.
+        // NFSMW_PARAM_GEN=0 leaves the register as the interpolator (old rule).
+        static const bool paramGenOn = [] { const char* v = std::getenv("NFSMW_PARAM_GEN"); return !v || v[0] != '0'; }();
+        key.paramGen = paramGenOn && gpu::RunsGuestPixelShader(edramMode, s_depthOnlyGuestPs)
+            ? gpu::param_gen::Register(s_regs[XE_GPU_REG_SQ_PROGRAM_CNTL], s_regs[XE_GPU_REG_SQ_CONTEXT_MISC])
+            : gpu::param_gen::kOff;
 
         bool pipelinePending;
         VkPipeline pipeline = GetPipeline(key, layout.pipeline, pipelinePending);
@@ -11012,6 +11022,12 @@ void main()
         pc.posScale[1] = 2.0f * sy / h;
         pc.posScale[2] = 2.0f * ox / w - 1.0f;
         pc.posScale[3] = 2.0f * oy / h - 1.0f;
+        {
+            // ps_param_gen's guest pixels per host pixel (gpu/param_gen.h).
+            const float gx = 1.0f / scaleX, gy = 1.0f / scaleY;
+            memcpy(&pc.vfRedirect[0][3], &gx, 4);
+            memcpy(&pc.vfRedirect[1][3], &gy, 4);
+        }
         pc.flags = 1u | (vte.vtx_w0_fmt ? 2u : 0u) | (vte.vtx_xy_fmt ? 4u : 0u) | (vte.vtx_z_fmt ? 8u : 0u);
 #ifdef SB_GAME_CARBON
         if (hdrGrade)
