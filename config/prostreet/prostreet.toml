@@ -1,6 +1,6 @@
 # XenonRecomp config for NFS: ProStreet (Xbox 360, USA, En/Es)
 # default.xex SHA-256 4f8b623a2a1ed06555b57da4e70411574ac962bce4b81bb100629ecc518275c2
-# Paths are relative to this file. Needs XenonRecomp with patch 0014+.
+# Paths are relative to this file. Needs XenonRecomp with patches 0014 and 0019.
 #
 # Regenerate the generated blocks and switch tables (from the repo root):
 #   tools/XenonRecomp/build/XenonAnalyse/XenonAnalyse game-prostreet/files/default.xex game-prostreet/survey/switch_tables.raw.toml
