@@ -3,6 +3,11 @@
 What changed in each SpeedBreaker: ProStreet build, newest first. The game shows the entry once,
 the first time a new version starts (offline: it's built into the game).
 
+## v0.1.2
+
+- Updated the port's runtime and code translation tools to the latest version for better stability. No visible
+  changes in the game.
+
 ## v0.1.1
 
 - Updated the port's runtime and code translation tools to the latest version for better stability. No visible
