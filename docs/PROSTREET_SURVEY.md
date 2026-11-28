@@ -245,6 +245,45 @@ menu change), menus and the race look the same in shots at the same times.
 
 `ctest -j3`: 102 of 102 passed.
 
+## Round 7 (2026-11-28, v0.1.2): fixes from the Deathly Hallows - Part 1 port
+
+The Deathly Hallows - Part 1 port (`hp7-dh-part1-x360-port`, from the HBP tree) found a
+recompiler bug and more general runtime bugs. Runs: 360 s each, a throwaway `HOME`, the disc
+extracted fresh, a new career into the first race (the round 6 script), `NFSMW_GLITCH_WATCH=1`,
+on a machine shared with another agent's builds (load average 10-13). A: the v0.1.1 build
+(2f8bccc, recompiled with 0001-0014); B: the fixes. Both: no crash or hang, the same
+`[glitch]` frames at the same scripted moments (title movie and menu changes: A 8, B 7), menus,
+the countdown and the race look the same in shots at the same times. Race (170-360 s): A 50.1
+fps mean (17 of 77 `[perf]` lines at 60), GPU busy 16.4 ms; B 59.0 fps (78 of 93 at 60), GPU
+busy 13.8 ms. Audio: 222,068 and 217,680 XMA frames decoded.
+
+| Fix | ProStreet evidence | Taken |
+|---|---|---|
+| XenonRecomp 0019: `bdzlr`/`bdnzlr` don't end a function (XenonAnalyse took them as `blr`) | One function changed: the CRT `memset` `sub_82A28680` (no `.pdata`, 1462 call sites) ended at its first `bdzlr`, so a length 2 or 3 bytes past a word left the last 1-2 bytes unset (DH1's heap corruption). Its two tail fragments `sub_82A28710`/`sub_82A28718` are gone (nothing referenced them); 0 FATAL, 0 `// ERROR` | yes |
+| `NtSuspendThread`/`NtResumeThread` write the previous suspend count | general kernel bug; boots and races as before | yes (`KeInitializeDpc` from the same commit: not imported by ProStreet) |
+| XNotify listeners are waitable; a wait on a non-waitable handle is logged once | no `[kernel] wait on handle` line in any run | yes |
+| `MmQueryStatistics` leaves the runtime's 64 MB heap out of the title's pages | its one caller is XAPI's `GlobalMemoryStatus`; ProStreet runs with the old count | no: it would change the game's memory sizing for no seen bug |
+| `XamContentGetCreator`/`GetDeviceState` complete their XOVERLAPPED, return `ERROR_IO_PENDING` | career created and saved ("Saving ..."), the race started as before | yes |
+| Bounded pipeline waits after a loading screen (`gpu/pipeline_wait_budget.h`) | first race load, fresh cache: draws skipped while pipelines compile, as before | yes |
+| XMA through XAudio's registers (`cpu/guest_mmio.h`) | 0 register kicks, locks or clears in 360 s with it built in: EA's audio uses the `XMA*` imports | no (not needed) |
+| tfetch filter overrides (`gpu/texture_filters.h`) | 0 fetch constants changed in a 260 s run (temporary counter) | yes (latent here) |
+| Front buffer at the display scaler's shape (`gpu/scaler.h`) | `[video] display scaler: source 1280x720, output 1280x720 (front buffer 1280x720)`: shown as before | yes (no effect here) |
+| Pixel parameter generation (`gpu/param_gen.h`) | ProStreet sets it: 9,120 draws in the race's first 25 s (temporary counter). Shots with `NFSMW_PARAM_GEN=0` and without at the countdown and the first corners: no difference seen | yes |
+| Pipeline warm-up (`pipelines.list`) and the pipeline cache made on its own thread | first run: `pipeline cache: 0 KB loaded (0.0 s, in the background)` | yes |
+| Dispatcher: one condition variable per wait (`kernel/wait_queue.h`) | the race's frame rate above (A/B under the same load) | yes, `NFSMW_WAKE_ALL=1` for the broadcast |
+| Repeated resolves skipped, resolves that write a page or texture whole (`gpu/resolve_repeat.h`, `resolve_cover.h`) | 0 repeats skipped; 14 stores a frame into textures written whole; `NFSMW_AB=3` in-run: 43.4 against 43.6 fps | yes |
+| Occlusion: a provisional END report (`gpu/zpd_report.h`) | one query a frame in the race, each END reported provisionally first | yes, `NFSMW_OCCLUSION_PROVISIONAL=0` to turn it off |
+| `draw_clear`: a depth-only rectangle clear with alpha test on is a clear | 0 such clears in 260 s (temporary counter) | yes (latent here) |
+
+Not taken: DH1's own hooks, keyboard layout, `XGetGameRegion`, frame-rate and cutscene hooks,
+XenonRecomp 0015-0018 (no FATAL here without them) and 0020 (speed; needs a per-game list).
+The pipeline warm-up commit moved Carbon's HDR grade check into `NewShader` (`MarkHdrGradeShader`),
+so a shader made by the warm-up gets it too.
+
+`ctest -j3`: 112 tests, 109 passed; `swapchain_use_test` passed alone; `game_identity_test` and
+`game_identity_carbon_test` pass on a clean export of the commit (they fail in this checkout only
+because of uncommitted deletions under `scripts/ios/`). `tests/run_instr_tests.sh`: 395, 0 failed.
+
 ## Risks and next round
 
 1. **Imports on the boot path.** Implement the new imports the boot actually
